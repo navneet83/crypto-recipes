@@ -9,6 +9,7 @@ import * as aead from "./aead_record_v1.mjs";
 import * as argon2 from "./pbe_record_v1.mjs";
 import * as sign from "./sign_detached_v1.mjs";
 import * as signPq from "./sign_detached_pq_v1.mjs";
+import * as hpke from "./hpke_envelope_v1.mjs";
 
 const hex = h => Uint8Array.from(h.match(/../g) ?? [], b => parseInt(b, 16));
 const toHex = b => [...b].map(x => x.toString(16).padStart(2, "0")).join("");
@@ -30,9 +31,21 @@ const RECIPES = {
         consume: it => aead.decrypt(hex(it.key_hex), it.record, it.aad),
     },
     ...(argon2.available ? { [argon2.RECIPE]: passwordRecipe(argon2) } : {}),
+    [hpke.RECIPE]: envelopeRecipe(hpke),
     [sign.RECIPE]: signatureRecipe(sign, true),
     ...(signPq.available ? { [signPq.RECIPE]: signatureRecipe(signPq, false) } : {}),
 };
+// Public-key encryption: a fresh ephemeral key per record, so own output is opened, not compared.
+function envelopeRecipe(r) {
+    const check = async c => { if (toHex(await r.publicKey(hex(c.private_hex))) !== c.public_hex) throw new Error("public key mismatch"); };
+    return {
+        deterministic: false,
+        replay: async c => { await check(c); return r.encrypt(hex(c.public_hex), c.plaintext); },
+        open: (c, field) => r.decrypt(hex(c.private_hex), c[field]),
+        emit: async i => { const priv = crypto.getRandomValues(new Uint8Array(32)); const pub = await r.publicKey(priv); return { private_hex: toHex(priv), public_hex: toHex(pub), plaintext: plaintextFor(i), record: await r.encrypt(pub, plaintextFor(i)) }; },
+        consume: async it => { await check(it); return r.decrypt(hex(it.private_hex), it.record); },
+    };
+}
 function signatureRecipe(r, deterministic) {
     return {
         deterministic, // ML-DSA signing is randomized; own output is checked by verification.
@@ -50,7 +63,7 @@ async function replay(name, impl) {
     const cases = JSON.parse(await readFile(new URL("cases.json", dir), "utf8")).cases;
     for (const c of cases) {
         const produced = await impl.replay(c);
-        const field = "signature_base64" in c ? "signature_base64" : "output_base64";
+        const field = ["signature_base64", "record_base64", "output_base64"].find(f => f in c);
         if (impl.deterministic === false) {
             if (await impl.open({ ...c, [field]: produced }, field) !== expected(c)) throw new Error(`${name} case ${c.id}: own output does not verify`);
         } else if (produced !== c[field]) throw new Error(`${name} case ${c.id}: produced ${produced}`);

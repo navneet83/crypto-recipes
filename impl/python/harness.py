@@ -12,6 +12,7 @@ import uuid
 
 sys.path.insert(0, os.path.dirname(__file__))
 import aead_record_v1  # noqa: E402
+import hpke_envelope_v1  # noqa: E402
 import pbe_record_pbkdf2_gcm_v1  # noqa: E402
 import pbe_record_v1  # noqa: E402
 import sign_detached_pq_v1  # noqa: E402
@@ -71,7 +72,24 @@ class SignPq(Sign):
     deterministic = False  # ML-DSA signing is randomized; own output is checked by verification.
 
 
-RECIPES = {Pbe.r.RECIPE: Pbe(), Aead.r.RECIPE: Aead(), Argon2.r.RECIPE: Argon2(), Sign.r.RECIPE: Sign(), SignPq.r.RECIPE: SignPq()}
+class Hpke:
+    r = hpke_envelope_v1
+    deterministic = False  # fresh ephemeral key per record; own output is checked by opening it.
+    def _check(self, c):
+        assert self.r.public_key(bytes.fromhex(c["private_hex"])).hex() == c["public_hex"], "public key mismatch"
+    def replay(self, c):
+        self._check(c)
+        return self.r.encrypt(bytes.fromhex(c["public_hex"]), c["plaintext"])
+    def open(self, c, field): return self.r.decrypt(bytes.fromhex(c["private_hex"]), c[field])
+    def emit(self, i):
+        priv = os.urandom(32); pub = self.r.public_key(priv)
+        return {"private_hex": priv.hex(), "public_hex": pub.hex(), "plaintext": _plaintext(i), "record": self.r.encrypt(pub, _plaintext(i))}
+    def consume(self, it):
+        self._check(it)
+        return self.r.decrypt(bytes.fromhex(it["private_hex"]), it["record"])
+
+
+RECIPES = {Pbe.r.RECIPE: Pbe(), Hpke.r.RECIPE: Hpke(), Aead.r.RECIPE: Aead(), Argon2.r.RECIPE: Argon2(), Sign.r.RECIPE: Sign(), SignPq.r.RECIPE: SignPq()}
 
 
 def expected(c):
@@ -85,7 +103,7 @@ def replay(name, impl):
         cases = json.load(f)["cases"]
     for c in cases:
         produced = impl.replay(c)
-        field = "signature_base64" if "signature_base64" in c else "output_base64"
+        field = next(f for f in ("signature_base64", "record_base64", "output_base64") if f in c)
         if getattr(impl, "deterministic", True):
             assert produced == c[field], f"{name} case {c['id']}: produced {produced}"
         else:

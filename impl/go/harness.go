@@ -30,6 +30,42 @@ type recipe struct {
 	randomized bool
 }
 
+// envelopeRecipe covers public-key encryption: a fresh ephemeral key per record, so own output is opened, not compared.
+func envelopeRecipe(pubOf func([]byte) ([]byte, error), encrypt func([]byte, string) (string, error), decrypt func([]byte, string) (string, error)) recipe {
+	checkPub := func(c fields) error {
+		pub, err := pubOf(unhex(c["private_hex"]))
+		if err != nil || hex.EncodeToString(pub) != c["public_hex"] {
+			return errors.New("public key mismatch")
+		}
+		return nil
+	}
+	return recipe{
+		replay: func(c fields) (string, error) {
+			if err := checkPub(c); err != nil {
+				return "", err
+			}
+			return encrypt(unhex(c["public_hex"]), c["plaintext"])
+		},
+		open: func(c fields, field string) (string, error) { return decrypt(unhex(c["private_hex"]), c[field]) },
+		emit: func(i int) (fields, error) {
+			priv := unhex(randomHex(32))
+			pub, err := pubOf(priv)
+			if err != nil {
+				return nil, err
+			}
+			rec, err := encrypt(pub, plaintextFor(i))
+			return fields{"private_hex": hex.EncodeToString(priv), "public_hex": hex.EncodeToString(pub), "plaintext": plaintextFor(i), "record": rec}, err
+		},
+		consume: func(it fields) (string, error) {
+			if err := checkPub(it); err != nil {
+				return "", err
+			}
+			return decrypt(unhex(it["private_hex"]), it["record"])
+		},
+		randomized: true,
+	}
+}
+
 func signatureRecipe(pubOf func([]byte) ([]byte, error), sign func([]byte, string) (string, error), verify func([]byte, string, string) error, randomized bool) recipe {
 	open := func(c fields, field string) (string, error) {
 		if err := verify(unhex(c["public_hex"]), c["message"], c[field]); err != nil {
@@ -79,7 +115,7 @@ func unhex(s string) []byte { b, _ := hex.DecodeString(s); return b }
 
 func randomHex(n int) string { b := make([]byte, n); rand.Read(b); return hex.EncodeToString(b) }
 
-var recipeOrder = []string{Recipe, AeadRecipe, Argon2Recipe, SignRecipe, SignPqRecipe}
+var recipeOrder = []string{Recipe, AeadRecipe, Argon2Recipe, SignRecipe, SignPqRecipe, HpkeRecipe}
 
 // Encryption vectors carry the plaintext, signature vectors the message.
 func expected(c fields) string {
@@ -114,6 +150,7 @@ var recipes = map[string]recipe{
 		},
 		consume: func(it fields) (string, error) { return Argon2Decrypt(it["password"], it["record"]) },
 	},
+	HpkeRecipe:   envelopeRecipe(HpkePublicKey, HpkeEncrypt, HpkeDecrypt),
 	SignRecipe:   signatureRecipe(SignPublicKey, Sign, Verify, false),
 	SignPqRecipe: signatureRecipe(SignPqPublicKey, SignPq, VerifyPq, true),
 	AeadRecipe: {
@@ -167,8 +204,10 @@ func replay(name string, r recipe) {
 	readJSON(filepath.Join(vdir, "cases.json"), &cases)
 	for _, c := range cases.Cases {
 		field := "output_base64"
-		if _, ok := c["signature_base64"]; ok {
-			field = "signature_base64"
+		for _, f := range []string{"signature_base64", "record_base64"} {
+			if _, ok := c[f]; ok {
+				field = f
+			}
 		}
 		produced, err := r.replay(c)
 		if err != nil {

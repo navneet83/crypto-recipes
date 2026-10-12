@@ -55,7 +55,32 @@ func signatureRecipe(publicKey: @escaping (Data) throws -> Data, sign: @escaping
         deterministic: deterministic)
 }
 
+/// Public-key encryption: a fresh ephemeral key per record, so own output is opened, not compared.
+func envelopeRecipe(publicKey: @escaping (Data) throws -> Data, encrypt: @escaping (Data, String) throws -> String,
+                    decrypt: @escaping (Data, String) throws -> String) -> Recipe {
+    func check(_ c: [String: String]) throws {
+        guard toHex(try publicKey(hex(c["private_hex"]!))) == c["public_hex"] else { fatalError("public key mismatch") }
+    }
+    return Recipe(
+        replay: { c in try check(c); return try encrypt(hex(c["public_hex"]!), c["plaintext"]!) },
+        open: { c, f in try decrypt(hex(c["private_hex"]!), c[f]!) },
+        emit: { i in let priv = randomBytes(32); let pub = try publicKey(priv)
+            return ["private_hex": toHex(priv), "public_hex": toHex(pub), "plaintext": plaintextFor(i), "record": try encrypt(pub, plaintextFor(i))] },
+        consume: { it in try check(it); return try decrypt(hex(it["private_hex"]!), it["record"]!) },
+        deterministic: false)
+}
+
 func pqRecipes() -> [(String, Recipe)] {
+    var out: [(String, Recipe)] = []
+    if #available(macOS 14.0, iOS 17.0, *) {
+        out.append((HpkeEnvelopeV1.recipe, envelopeRecipe(publicKey: { try HpkeEnvelopeV1.publicKey(privateKey: $0) },
+                                                          encrypt: { try HpkeEnvelopeV1.encrypt(publicKey: $0, plaintext: $1) },
+                                                          decrypt: { try HpkeEnvelopeV1.decrypt(privateKey: $0, text: $1) })))
+    }
+    return out + mldsaRecipes()
+}
+
+func mldsaRecipes() -> [(String, Recipe)] {
     if #available(macOS 26.0, iOS 26.0, *) {
         return [(SignDetachedPqV1.recipe, signatureRecipe(publicKey: SignDetachedPqV1.publicKey, sign: SignDetachedPqV1.sign, verify: SignDetachedPqV1.verify, deterministic: false))]
     }
@@ -75,7 +100,7 @@ func replay(_ name: String, _ r: Recipe) throws {
     let cases = try JSONDecoder().decode(CaseFile.self, from: Data(contentsOf: vdir.appendingPathComponent("cases.json"))).cases
     for c in cases {
         let produced = try r.replay(c)
-        let field = c["signature_base64"] != nil ? "signature_base64" : "output_base64"
+        let field = c["signature_base64"] != nil ? "signature_base64" : c["record_base64"] != nil ? "record_base64" : "output_base64"
         if r.deterministic {
             guard produced == c[field] else { fatalError("\(name) case \(c["id"]!): produced \(produced)") }
         } else {

@@ -28,6 +28,30 @@ public final class Harness {
         void verify(byte[] pub, String message, String signature) throws Exception;
     }
 
+    interface Envelope {
+        byte[] publicKey(byte[] privateKey) throws Exception;
+        String encrypt(byte[] publicKey, String plaintext) throws Exception;
+        String decrypt(byte[] privateKey, String record) throws Exception;
+    }
+
+    /** Public-key encryption: a fresh ephemeral key per record, so own output is opened, not compared. */
+    static Recipe envelopeRecipe(Envelope r) {
+        return new Recipe() {
+            public boolean deterministic() { return false; }
+            void check(Map<String, String> c) throws Exception {
+                if (!toHex(r.publicKey(hex(c.get("private_hex")))).equals(c.get("public_hex"))) throw new IllegalStateException("public key mismatch");
+            }
+            public String replay(Map<String, String> c) throws Exception { check(c); return r.encrypt(hex(c.get("public_hex")), c.get("plaintext")); }
+            public String open(Map<String, String> c, String f) throws Exception { return r.decrypt(hex(c.get("private_hex")), c.get(f)); }
+            public Map<String, String> emit(int i) throws Exception {
+                byte[] priv = new byte[32]; RANDOM.nextBytes(priv);
+                byte[] pub = r.publicKey(priv);
+                return Map.of("private_hex", toHex(priv), "public_hex", toHex(pub), "plaintext", plaintextFor(i), "record", r.encrypt(pub, plaintextFor(i)));
+            }
+            public String consume(Map<String, String> it) throws Exception { check(it); return r.decrypt(hex(it.get("private_hex")), it.get("record")); }
+        };
+    }
+
     static Recipe signatureRecipe(Signer r, boolean deterministic) {
         return new Recipe() {
             public boolean deterministic() { return deterministic; }
@@ -77,6 +101,11 @@ public final class Harness {
             public String sign(byte[] seed, String m) throws Exception { return SignDetachedV1.sign(seed, m); }
             public void verify(byte[] pub, String m, String sig) throws Exception { SignDetachedV1.verify(pub, m, sig); }
         }, true));
+        RECIPES.put(HpkeEnvelopeV1.RECIPE, envelopeRecipe(new Envelope() {
+            public byte[] publicKey(byte[] k) throws Exception { return HpkeEnvelopeV1.publicKey(k); }
+            public String encrypt(byte[] pub, String pt) throws Exception { return HpkeEnvelopeV1.encrypt(pub, pt); }
+            public String decrypt(byte[] priv, String rec) throws Exception { return HpkeEnvelopeV1.decrypt(priv, rec); }
+        }));
         if (SignDetachedPqV1.available()) RECIPES.put(SignDetachedPqV1.RECIPE, signatureRecipe(new Signer() {
             public byte[] publicKey(byte[] seed) throws Exception { return SignDetachedPqV1.publicKey(seed); }
             public String sign(byte[] seed, String m) throws Exception { return SignDetachedPqV1.sign(seed, m); }
@@ -159,7 +188,7 @@ public final class Harness {
         List<Map<String, String>> cases = objects(Files.readString(vdir.resolve("cases.json")), new HashMap<>());
         for (var c : cases) {
             String produced = r.replay(c);
-            String field = c.containsKey("signature_base64") ? "signature_base64" : "output_base64";
+            String field = c.containsKey("signature_base64") ? "signature_base64" : c.containsKey("record_base64") ? "record_base64" : "output_base64";
             if (!r.deterministic()) {
                 Map<String, String> own = new HashMap<>(c); own.put(field, produced);
                 if (!r.open(own, field).equals(expected(c))) throw new IllegalStateException(name + " case " + c.get("id") + ": own output does not verify");

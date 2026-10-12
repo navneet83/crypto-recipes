@@ -1,0 +1,78 @@
+{
+ "recipe": "hpke-envelope-v1",
+ "note": "Every case must fail to open.",
+ "cases": [
+  {
+   "id": "wrong-recipient",
+   "private_hex": "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+   "input_base64": "AYxOsqF+VCyhF1q5xp8NT+BlFRU5RAgJkQE1uR1++8FRxZGdQhPqqTWVjFgZ355IUm3+9AM067K9VaVR22bJzbF0abxUKksPPDe7+4Qp8QsdCFRCiKzpKUj2DVI=",
+   "note": "opened with a different recipient's private key"
+  },
+  {
+   "id": "sealed-to-other",
+   "private_hex": "497b4502664cfea5d5af0b39934dac72242a74f8480451e1aee7d6a53320333d",
+   "input_base64": "AWfizpebyBEYNd7LrucYDu4ySJe7qXCmgcu5SWo91uktxNTh74wlQ4V5UNNoOli/rsq3mSZWuUMd4HTQw79fj8ert7VaMCGOGb+AzauXHa0a9UMkNqSLrrSRkaE=",
+   "note": "a record sealed to a different public key"
+  },
+  {
+   "id": "enc-flipped",
+   "private_hex": "497b4502664cfea5d5af0b39934dac72242a74f8480451e1aee7d6a53320333d",
+   "input_base64": "AY1OsqF+VCyhF1q5xp8NT+BlFRU5RAgJkQE1uR1++8FRxZGdQhPqqTWVjFgZ355IUm3+9AM067K9VaVR22bJzbF0abxUKksPPDe7+4Qp8QsdCFRCiKzpKUj2DVI=",
+   "note": "first byte of the encapsulated key flipped"
+  },
+  {
+   "id": "ciphertext-flipped",
+   "private_hex": "497b4502664cfea5d5af0b39934dac72242a74f8480451e1aee7d6a53320333d",
+   "input_base64": "AYxOsqF+VCyhF1q5xp8NT+BlFRU5RAgJkQE1uR1++8FRxJGdQhPqqTWVjFgZ355IUm3+9AM067K9VaVR22bJzbF0abxUKksPPDe7+4Qp8QsdCFRCiKzpKUj2DVI=",
+   "note": "first ciphertext byte flipped"
+  },
+  {
+   "id": "tag-flipped",
+   "private_hex": "497b4502664cfea5d5af0b39934dac72242a74f8480451e1aee7d6a53320333d",
+   "input_base64": "AYxOsqF+VCyhF1q5xp8NT+BlFRU5RAgJkQE1uR1++8FRxZGdQhPqqTWVjFgZ355IUm3+9AM067K9VaVR22bJzbF0abxUKksPPDe7+4Qp8QsdCFRCiKzpKUj2DVM=",
+   "note": "last byte of the tag flipped"
+  },
+  {
+   "id": "truncated-tag",
+   "private_hex": "497b4502664cfea5d5af0b39934dac72242a74f8480451e1aee7d6a53320333d",
+   "input_base64": "AYxOsqF+VCyhF1q5xp8NT+BlFRU5RAgJkQE1uR1++8FRxZGdQhPqqTWVjFgZ355IUm3+9AM067K9VaVR22bJzbF0abxUKksPPDe7+4Qp8QsdCFRCiKzpKUj2DQ==",
+   "note": "one byte of the tag missing"
+  },
+  {
+   "id": "truncated-to-header",
+   "private_hex": "497b4502664cfea5d5af0b39934dac72242a74f8480451e1aee7d6a53320333d",
+   "input_base64": "AYxOsqF+VCyhF1q5xp8NT+BlFRU5RAgJkQE1uR1++8FR",
+   "note": "no ciphertext and no tag"
+  },
+  {
+   "id": "wrong-version",
+   "private_hex": "497b4502664cfea5d5af0b39934dac72242a74f8480451e1aee7d6a53320333d",
+   "input_base64": "AoxOsqF+VCyhF1q5xp8NT+BlFRU5RAgJkQE1uR1++8FRxZGdQhPqqTWVjFgZ355IUm3+9AM067K9VaVR22bJzbF0abxUKksPPDe7+4Qp8QsdCFRCiKzpKUj2DVI=",
+   "note": "version byte 0x02"
+  },
+  {
+   "id": "no-version",
+   "private_hex": "497b4502664cfea5d5af0b39934dac72242a74f8480451e1aee7d6a53320333d",
+   "input_base64": "jE6yoX5ULKEXWrnGnw1P4GUVFTlECAmRATW5HX77wVHFkZ1CE+qpNZWMWBnfnkhSbf70AzTrsr1VpVHbZsnNsXRpvFQqSw88N7v7hCnxCx0IVEKIrOkpSPYNUg==",
+   "note": "layout without the leading byte"
+  },
+  {
+   "id": "wrong-info",
+   "private_hex": "497b4502664cfea5d5af0b39934dac72242a74f8480451e1aee7d6a53320333d",
+   "input_base64": "ASLbzvqujWJo4hrPmXFh1fLDlHzIwZmn3e6UMjlBYSY8chgEqBQ6rFg0/enS+IBqaPaO5fM+mpymEprKT5bslNZJ98DRdutfufXFidAGTuGO/bVjYqqXyVJNQRA=",
+   "note": "sealed with a different HPKE info string"
+  },
+  {
+   "id": "empty-input",
+   "private_hex": "497b4502664cfea5d5af0b39934dac72242a74f8480451e1aee7d6a53320333d",
+   "input_base64": "",
+   "note": "empty string"
+  },
+  {
+   "id": "not-base64",
+   "private_hex": "497b4502664cfea5d5af0b39934dac72242a74f8480451e1aee7d6a53320333d",
+   "input_base64": "@@@@",
+   "note": "not Base64"
+  }
+ ]
+}
