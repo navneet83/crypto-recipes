@@ -8,6 +8,7 @@ import * as pbe from "./pbe_record_pbkdf2_gcm_v1.mjs";
 import * as aead from "./aead_record_v1.mjs";
 import * as argon2 from "./pbe_record_v1.mjs";
 import * as sign from "./sign_detached_v1.mjs";
+import * as signPq from "./sign_detached_pq_v1.mjs";
 
 const hex = h => Uint8Array.from(h.match(/../g) ?? [], b => parseInt(b, 16));
 const toHex = b => [...b].map(x => x.toString(16).padStart(2, "0")).join("");
@@ -29,13 +30,18 @@ const RECIPES = {
         consume: it => aead.decrypt(hex(it.key_hex), it.record, it.aad),
     },
     ...(argon2.available ? { [argon2.RECIPE]: passwordRecipe(argon2) } : {}),
-    [sign.RECIPE]: {
-        replay: async c => { if (toHex(await sign.publicKey(hex(c.seed_hex))) !== c.public_hex) throw new Error(`${c.id}: public key mismatch`); return sign.sign(hex(c.seed_hex), c.message); },
-        open: async (c, field) => { await sign.verify(hex(c.public_hex), c.message, c[field]); return c.message; },
-        emit: async i => { const seed = crypto.getRandomValues(new Uint8Array(32)); return { seed_hex: toHex(seed), public_hex: toHex(await sign.publicKey(seed)), message: plaintextFor(i), record: await sign.sign(seed, plaintextFor(i)) }; },
-        consume: async it => { if (toHex(await sign.publicKey(hex(it.seed_hex))) !== it.public_hex) throw new Error("public key mismatch"); await sign.verify(hex(it.public_hex), it.message, it.record); return it.message; },
-    },
+    [sign.RECIPE]: signatureRecipe(sign, true),
+    ...(signPq.available ? { [signPq.RECIPE]: signatureRecipe(signPq, false) } : {}),
 };
+function signatureRecipe(r, deterministic) {
+    return {
+        deterministic, // ML-DSA signing is randomized; own output is checked by verification.
+        replay: async c => { if (toHex(await r.publicKey(hex(c.seed_hex))) !== c.public_hex) throw new Error(`${c.id}: public key mismatch`); return r.sign(hex(c.seed_hex), c.message); },
+        open: async (c, field) => { await r.verify(hex(c.public_hex), c.message, c[field]); return c.message; },
+        emit: async i => { const seed = crypto.getRandomValues(new Uint8Array(32)); return { seed_hex: toHex(seed), public_hex: toHex(await r.publicKey(seed)), message: plaintextFor(i), record: await r.sign(seed, plaintextFor(i)) }; },
+        consume: async it => { if (toHex(await r.publicKey(hex(it.seed_hex))) !== it.public_hex) throw new Error("public key mismatch"); await r.verify(hex(it.public_hex), it.message, it.record); return it.message; },
+    };
+}
 // Encryption vectors carry the plaintext, signature vectors the message.
 const expected = c => "message" in c ? c.message : c.plaintext;
 
@@ -45,7 +51,9 @@ async function replay(name, impl) {
     for (const c of cases) {
         const produced = await impl.replay(c);
         const field = "signature_base64" in c ? "signature_base64" : "output_base64";
-        if (produced !== c[field]) throw new Error(`${name} case ${c.id}: produced ${produced}`);
+        if (impl.deterministic === false) {
+            if (await impl.open({ ...c, [field]: produced }, field) !== expected(c)) throw new Error(`${name} case ${c.id}: own output does not verify`);
+        } else if (produced !== c[field]) throw new Error(`${name} case ${c.id}: produced ${produced}`);
         if (await impl.open(c, field) !== expected(c)) throw new Error(`${name} case ${c.id}: open mismatch`);
     }
     const negative = JSON.parse(await readFile(new URL("negative.json", dir), "utf8")).cases;

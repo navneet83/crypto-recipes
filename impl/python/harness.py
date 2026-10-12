@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import aead_record_v1  # noqa: E402
 import pbe_record_pbkdf2_gcm_v1  # noqa: E402
 import pbe_record_v1  # noqa: E402
+import sign_detached_pq_v1  # noqa: E402
 import sign_detached_v1  # noqa: E402
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -49,6 +50,7 @@ class Argon2(Pbe):
 
 class Sign:
     r = sign_detached_v1
+    deterministic = True
     def replay(self, c):
         assert self.r.public_key(bytes.fromhex(c["seed_hex"])).hex() == c["public_hex"], f"{c['id']}: public key mismatch"
         return self.r.sign(bytes.fromhex(c["seed_hex"]), c["message"])
@@ -64,7 +66,12 @@ class Sign:
         return it["message"]
 
 
-RECIPES = {Pbe.r.RECIPE: Pbe(), Aead.r.RECIPE: Aead(), Argon2.r.RECIPE: Argon2(), Sign.r.RECIPE: Sign()}
+class SignPq(Sign):
+    r = sign_detached_pq_v1
+    deterministic = False  # ML-DSA signing is randomized; own output is checked by verification.
+
+
+RECIPES = {Pbe.r.RECIPE: Pbe(), Aead.r.RECIPE: Aead(), Argon2.r.RECIPE: Argon2(), Sign.r.RECIPE: Sign(), SignPq.r.RECIPE: SignPq()}
 
 
 def expected(c):
@@ -79,7 +86,10 @@ def replay(name, impl):
     for c in cases:
         produced = impl.replay(c)
         field = "signature_base64" if "signature_base64" in c else "output_base64"
-        assert produced == c[field], f"{name} case {c['id']}: produced {produced}"
+        if getattr(impl, "deterministic", True):
+            assert produced == c[field], f"{name} case {c['id']}: produced {produced}"
+        else:
+            assert impl.open({**c, field: produced}, field) == expected(c), f"{name} case {c['id']}: own output does not verify"
         assert impl.open(c, field) == expected(c), f"{name} case {c['id']}: open mismatch"
     with open(os.path.join(vdir, "negative.json")) as f:
         negative = json.load(f)["cases"]

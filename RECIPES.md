@@ -132,7 +132,34 @@ A signature made for this recipe therefore means nothing to another protocol tha
 
 ## sign-detached-pq-v1
 
-Planned. ML-DSA-65 (FIPS 204), the parameter set every platform that ships ML-DSA has in common; the scope said 44, which CryptoKit does not offer. The same domain-separated input, carried in the FIPS 204 context string where the platform exposes it.
+**Task.** The same as `sign-detached-v1`, for signatures that must still hold once a cryptographically relevant quantum computer exists: software releases, firmware, documents with a long life, anything a verifier might check in 2040. Conservative deployments carry both an Ed25519 and an ML-DSA signature and require both; this recipe is the second half of that pair.
+
+**Not for.** Anything with tight size limits. An ML-DSA-65 public key is 1952 bytes and a signature is 3309, against 32 and 64 for Ed25519.
+
+**Keys.** ML-DSA-65 (FIPS 204). The scope said ML-DSA-44; 65 is the set every platform that ships ML-DSA has in common (CryptoKit offers 65 and 87 only) and the one most guidance picks as the default. The private key is the 32-byte seed; the public key is the 1952-byte FIPS 204 encoding. Both are Base64 when transported. All six platforms rebuild the same key pair from the seed, which was checked by deriving the public key for one fixed seed on each of them. Two fixed DER wrappers appear in the files: the PKCS#8 form of a seed is the 22-byte prefix `3034020100300b060960864801650304031204228020` followed by the seed, and the X.509 form of a public key is `308207b2300b0609608648016503040312038207a100` followed by the 1952 bytes. The JDK and Node produce and accept exactly these.
+
+**Input.** The signed bytes are
+
+```
+"crypto-recipes/sign-detached-pq-v1" || 0x00 || message
+```
+
+with an empty FIPS 204 context string. FIPS 204 has a context parameter made for this purpose, and Node, pyca, Go, CryptoKit and .NET expose it; the JDK does not as of Java 27. A prefix in the message works everywhere and is checked by the negative case `prefix-as-context`, which is the raw message signed with the recipe name as the context string and must not verify.
+
+**Signature.** The 3309 raw bytes, Base64. ML-DSA signing is randomized by default on every platform here (Go also offers a deterministic mode), so two signatures of one message differ and both verify. Verification fails by exception for anything that is not exactly 3309 bytes.
+
+**Vectors.** [`vectors/sign-detached-pq-v1/`](vectors/sign-detached-pq-v1/). Every implementation must derive the vector's public key from its seed and verify the vector's signature; its own signatures are checked by verification. Case `seed-07` uses the seed of 32 bytes `0x07`, the one used for the cross-platform key derivation check.
+
+**Implementations.**
+
+| Language | File | ML-DSA from |
+|---|---|---|
+| Swift | [`impl/swift/Sources/Recipes/SignDetachedPqV1.swift`](impl/swift/Sources/Recipes/SignDetachedPqV1.swift) | CryptoKit, macOS 26 and iOS 26 |
+| TypeScript | [`impl/typescript/sign_detached_pq_v1.mjs`](impl/typescript/sign_detached_pq_v1.mjs) | `node:crypto`, Node 26; WebCrypto has no ML-DSA yet |
+| Python | [`impl/python/sign_detached_pq_v1.py`](impl/python/sign_detached_pq_v1.py) | pyca/cryptography 46+ (OpenSSL 3.5) |
+| Go | [`impl/go/sign_detached_pq_v1.go`](impl/go/sign_detached_pq_v1.go) | `crypto/mldsa`, Go 1.27 |
+| Java, Kotlin | [`impl/java/SignDetachedPqV1.java`](impl/java/SignDetachedPqV1.java) | JCA, Java 24+ |
+| C# | [`impl/csharp/SignDetachedPqV1.cs`](impl/csharp/SignDetachedPqV1.cs) | `System.Security.Cryptography.MLDsa`, .NET 10, Linux and Windows only |
 
 ## password-hash-v1
 

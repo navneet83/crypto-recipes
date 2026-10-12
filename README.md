@@ -16,11 +16,12 @@ It is a test suite with worked examples, not a library to depend on. Copy the fi
 | `hpke-envelope-v1` | encrypt to a recipient's public key (RFC 9180, X25519) | planned | | | | | |
 | `hpke-envelope-pq-v1` | same, hybrid X25519 + ML-KEM-768 | planned | | | | | |
 | [`sign-detached-v1`](RECIPES.md#sign-detached-v1) | sign a message and verify the signature (Ed25519) | ✅ | ✅ | ✅ | ✅ | none² | ✅ |
-| `sign-detached-pq-v1` | same with ML-DSA-65 | planned | planned | planned | planned | planned | planned |
+| [`sign-detached-pq-v1`](RECIPES.md#sign-detached-pq-v1) | the same, post-quantum (ML-DSA-65) | ✅ macOS 26 | ✅ Node | ✅ | ✅ Java 24 | ✅ Linux/Windows³ | ✅ |
 | `password-hash-v1` | store and verify a password | planned | | | | | |
 
 ¹ No Argon2id in the platform's standard library. These platforms use `pbe-record-pbkdf2-gcm-v1`, which is the same recipe with PBKDF2; the two do not interoperate, and the recipe page explains the choice.
 ² .NET has no Ed25519 in `System.Security.Cryptography`; the recipe page says what to do.
+³ .NET 10 enables ML-DSA on Linux (OpenSSL 3.5+) and Windows, not on macOS; the Linux CI job covers it.
 
 [RECIPES.md](RECIPES.md) has one page per recipe: what it is for, what it is not for, the exact layout, and the parameters that must not be lowered. [SCOPE.md](SCOPE.md) is the plan for version 1.
 
@@ -53,7 +54,7 @@ java -Drecipes.root=. impl/java/Harness.java
 RECIPES_ROOT=. dotnet run --project impl/csharp
 ```
 
-Every harness takes the same arguments: none to replay the vectors, `--list` to print the recipes it supports, `<recipe> --emit N FILE` to write random records, `<recipe> --consume FILE` to open another implementation's records. Needs Node 26+ (20+ without `pbe-record-v1`), Python 3.10+, Swift 5.9+, Go 1.26+, Java 22+ for the harness (the recipe classes run on 17+) and .NET 8+. CI runs the crosscheck on macOS and, without Swift, on Linux on every push.
+Every harness takes the same arguments: none to replay the vectors, `--list` to print the recipes it supports, `<recipe> --emit N FILE` to write random records, `<recipe> --consume FILE` to open another implementation's records. Needs Node 26+ (20+ without the Argon2id and ML-DSA recipes), Python 3.10+, Swift 5.9+, Go 1.27+, Java 22+ for the harness (the recipe classes run on 17+) and .NET 8+. CI runs the crosscheck on macOS and, without Swift, on Linux on every push.
 
 ## Rules
 

@@ -36,17 +36,31 @@ let recipes: [(String, Recipe)] = [
         open: { c, f in try AeadRecordV1.decrypt(key: hex(c["key_hex"]!), text: c[f]!, aad: c["aad"]!) },
         emit: { i in let key = randomBytes(32); let aad = i % 2 == 0 ? "aad-\(i)" : ""; return ["key_hex": toHex(key), "aad": aad, "plaintext": plaintextFor(i), "record": try AeadRecordV1.encrypt(key: key, plaintext: plaintextFor(i), aad: aad)] },
         consume: { it in try AeadRecordV1.decrypt(key: hex(it["key_hex"]!), text: it["record"]!, aad: it["aad"]!) })),
-    (SignDetachedV1.recipe, Recipe(
+    (SignDetachedV1.recipe, signatureRecipe(publicKey: SignDetachedV1.publicKey, sign: SignDetachedV1.sign, verify: SignDetachedV1.verify, deterministic: false)),
+] + pqRecipes()
+
+/// CryptoKit randomizes Ed25519 signing, and ML-DSA signing is randomized by definition, so neither output can equal
+/// the vector; the harness verifies their own output instead.
+func signatureRecipe(publicKey: @escaping (Data) throws -> Data, sign: @escaping (Data, String) throws -> String,
+                     verify: @escaping (Data, String, String) throws -> Void, deterministic: Bool) -> Recipe {
+    Recipe(
         replay: { c in
-            guard toHex(try SignDetachedV1.publicKey(seed: hex(c["seed_hex"]!))) == c["public_hex"] else { fatalError("\(c["id"]!): public key mismatch") }
-            return try SignDetachedV1.sign(seed: hex(c["seed_hex"]!), message: c["message"]!) },
-        open: { c, f in try SignDetachedV1.verify(publicKey: hex(c["public_hex"]!), message: c["message"]!, signature: c[f]!); return c["message"]! },
-        emit: { i in let seed = randomBytes(32); return ["seed_hex": toHex(seed), "public_hex": toHex(try SignDetachedV1.publicKey(seed: seed)), "message": plaintextFor(i), "record": try SignDetachedV1.sign(seed: seed, message: plaintextFor(i))] },
+            guard toHex(try publicKey(hex(c["seed_hex"]!))) == c["public_hex"] else { fatalError("\(c["id"]!): public key mismatch") }
+            return try sign(hex(c["seed_hex"]!), c["message"]!) },
+        open: { c, f in try verify(hex(c["public_hex"]!), c["message"]!, c[f]!); return c["message"]! },
+        emit: { i in let seed = randomBytes(32); return ["seed_hex": toHex(seed), "public_hex": toHex(try publicKey(seed)), "message": plaintextFor(i), "record": try sign(seed, plaintextFor(i))] },
         consume: { it in
-            guard toHex(try SignDetachedV1.publicKey(seed: hex(it["seed_hex"]!))) == it["public_hex"] else { fatalError("public key mismatch") }
-            try SignDetachedV1.verify(publicKey: hex(it["public_hex"]!), message: it["message"]!, signature: it["record"]!); return it["message"]! },
-        deterministic: false)),
-]
+            guard toHex(try publicKey(hex(it["seed_hex"]!))) == it["public_hex"] else { fatalError("public key mismatch") }
+            try verify(hex(it["public_hex"]!), it["message"]!, it["record"]!); return it["message"]! },
+        deterministic: deterministic)
+}
+
+func pqRecipes() -> [(String, Recipe)] {
+    if #available(macOS 26.0, iOS 26.0, *) {
+        return [(SignDetachedPqV1.recipe, signatureRecipe(publicKey: SignDetachedPqV1.publicKey, sign: SignDetachedPqV1.sign, verify: SignDetachedPqV1.verify, deterministic: false))]
+    }
+    return []
+}
 
 /// Encryption vectors carry the plaintext, signature vectors the message.
 func expected(_ c: [String: String]) -> String { c["message"] ?? c["plaintext"]! }

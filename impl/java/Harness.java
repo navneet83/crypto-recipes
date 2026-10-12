@@ -18,6 +18,33 @@ public final class Harness {
         String open(Map<String, String> c, String field) throws Exception;
         Map<String, String> emit(int i) throws Exception;
         String consume(Map<String, String> it) throws Exception;
+        /** False for a signature scheme whose output cannot equal the vector; own output is verified instead. */
+        default boolean deterministic() { return true; }
+    }
+
+    interface Signer {
+        byte[] publicKey(byte[] seed) throws Exception;
+        String sign(byte[] seed, String message) throws Exception;
+        void verify(byte[] pub, String message, String signature) throws Exception;
+    }
+
+    static Recipe signatureRecipe(Signer r, boolean deterministic) {
+        return new Recipe() {
+            public boolean deterministic() { return deterministic; }
+            public String replay(Map<String, String> c) throws Exception {
+                if (!toHex(r.publicKey(hex(c.get("seed_hex")))).equals(c.get("public_hex"))) throw new IllegalStateException(c.get("id") + ": public key mismatch");
+                return r.sign(hex(c.get("seed_hex")), c.get("message"));
+            }
+            public String open(Map<String, String> c, String f) throws Exception { r.verify(hex(c.get("public_hex")), c.get("message"), c.get(f)); return c.get("message"); }
+            public Map<String, String> emit(int i) throws Exception {
+                byte[] seed = new byte[32]; RANDOM.nextBytes(seed);
+                return Map.of("seed_hex", toHex(seed), "public_hex", toHex(r.publicKey(seed)), "message", plaintextFor(i), "record", r.sign(seed, plaintextFor(i)));
+            }
+            public String consume(Map<String, String> it) throws Exception {
+                if (!toHex(r.publicKey(hex(it.get("seed_hex")))).equals(it.get("public_hex"))) throw new IllegalStateException("public key mismatch");
+                return open(it, "record");
+            }
+        };
     }
 
     static final SecureRandom RANDOM = new SecureRandom();
@@ -45,21 +72,16 @@ public final class Harness {
     }
 
     static {
-        RECIPES.put(SignDetachedV1.RECIPE, new Recipe() {
-            public String replay(Map<String, String> c) throws Exception {
-                if (!toHex(SignDetachedV1.publicKey(hex(c.get("seed_hex")))).equals(c.get("public_hex"))) throw new IllegalStateException(c.get("id") + ": public key mismatch");
-                return SignDetachedV1.sign(hex(c.get("seed_hex")), c.get("message"));
-            }
-            public String open(Map<String, String> c, String f) throws Exception { SignDetachedV1.verify(hex(c.get("public_hex")), c.get("message"), c.get(f)); return c.get("message"); }
-            public Map<String, String> emit(int i) throws Exception {
-                byte[] seed = new byte[32]; RANDOM.nextBytes(seed);
-                return Map.of("seed_hex", toHex(seed), "public_hex", toHex(SignDetachedV1.publicKey(seed)), "message", plaintextFor(i), "record", SignDetachedV1.sign(seed, plaintextFor(i)));
-            }
-            public String consume(Map<String, String> it) throws Exception {
-                if (!toHex(SignDetachedV1.publicKey(hex(it.get("seed_hex")))).equals(it.get("public_hex"))) throw new IllegalStateException("public key mismatch");
-                return open(it, "record");
-            }
-        });
+        RECIPES.put(SignDetachedV1.RECIPE, signatureRecipe(new Signer() {
+            public byte[] publicKey(byte[] seed) throws Exception { return SignDetachedV1.publicKey(seed); }
+            public String sign(byte[] seed, String m) throws Exception { return SignDetachedV1.sign(seed, m); }
+            public void verify(byte[] pub, String m, String sig) throws Exception { SignDetachedV1.verify(pub, m, sig); }
+        }, true));
+        if (SignDetachedPqV1.available()) RECIPES.put(SignDetachedPqV1.RECIPE, signatureRecipe(new Signer() {
+            public byte[] publicKey(byte[] seed) throws Exception { return SignDetachedPqV1.publicKey(seed); }
+            public String sign(byte[] seed, String m) throws Exception { return SignDetachedPqV1.sign(seed, m); }
+            public void verify(byte[] pub, String m, String sig) throws Exception { SignDetachedPqV1.verify(pub, m, sig); }
+        }, false));
     }
 
     /** Encryption vectors carry the plaintext, signature vectors the message. */
@@ -138,7 +160,10 @@ public final class Harness {
         for (var c : cases) {
             String produced = r.replay(c);
             String field = c.containsKey("signature_base64") ? "signature_base64" : "output_base64";
-            if (!produced.equals(c.get(field))) throw new IllegalStateException(name + " case " + c.get("id") + ": produced " + produced);
+            if (!r.deterministic()) {
+                Map<String, String> own = new HashMap<>(c); own.put(field, produced);
+                if (!r.open(own, field).equals(expected(c))) throw new IllegalStateException(name + " case " + c.get("id") + ": own output does not verify");
+            } else if (!produced.equals(c.get(field))) throw new IllegalStateException(name + " case " + c.get("id") + ": produced " + produced);
             if (!r.open(c, field).equals(expected(c))) throw new IllegalStateException(name + " case " + c.get("id") + ": open mismatch");
         }
         List<Map<String, String>> negative = objects(Files.readString(vdir.resolve("negative.json")), new HashMap<>());

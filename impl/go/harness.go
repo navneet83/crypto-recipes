@@ -26,6 +26,46 @@ type recipe struct {
 	open    func(c fields, field string) (string, error)
 	emit    func(i int) (fields, error)
 	consume func(it fields) (string, error)
+	// randomized marks a signature recipe whose output cannot equal the vector; own output is verified instead.
+	randomized bool
+}
+
+func signatureRecipe(pubOf func([]byte) ([]byte, error), sign func([]byte, string) (string, error), verify func([]byte, string, string) error, randomized bool) recipe {
+	open := func(c fields, field string) (string, error) {
+		if err := verify(unhex(c["public_hex"]), c["message"], c[field]); err != nil {
+			return "", err
+		}
+		return c["message"], nil
+	}
+	checkPub := func(c fields) error {
+		pub, err := pubOf(unhex(c["seed_hex"]))
+		if err != nil || hex.EncodeToString(pub) != c["public_hex"] {
+			return errors.New("public key mismatch")
+		}
+		return nil
+	}
+	return recipe{
+		replay: func(c fields) (string, error) {
+			if err := checkPub(c); err != nil {
+				return "", err
+			}
+			return sign(unhex(c["seed_hex"]), c["message"])
+		},
+		open: open,
+		emit: func(i int) (fields, error) {
+			seed := unhex(randomHex(32))
+			pub, _ := pubOf(seed)
+			sig, err := sign(seed, plaintextFor(i))
+			return fields{"seed_hex": hex.EncodeToString(seed), "public_hex": hex.EncodeToString(pub), "message": plaintextFor(i), "record": sig}, err
+		},
+		consume: func(it fields) (string, error) {
+			if err := checkPub(it); err != nil {
+				return "", err
+			}
+			return open(it, "record")
+		},
+		randomized: randomized,
+	}
 }
 
 func plaintextFor(i int) string {
@@ -39,7 +79,7 @@ func unhex(s string) []byte { b, _ := hex.DecodeString(s); return b }
 
 func randomHex(n int) string { b := make([]byte, n); rand.Read(b); return hex.EncodeToString(b) }
 
-var recipeOrder = []string{Recipe, AeadRecipe, Argon2Recipe, SignRecipe}
+var recipeOrder = []string{Recipe, AeadRecipe, Argon2Recipe, SignRecipe, SignPqRecipe}
 
 // Encryption vectors carry the plaintext, signature vectors the message.
 func expected(c fields) string {
@@ -47,13 +87,6 @@ func expected(c fields) string {
 		return m
 	}
 	return c["plaintext"]
-}
-
-func signOpen(c fields, field string) (string, error) {
-	if err := Verify(unhex(c["public_hex"]), c["message"], c[field]); err != nil {
-		return "", err
-	}
-	return c["message"], nil
 }
 
 var recipes = map[string]recipe{
@@ -81,29 +114,8 @@ var recipes = map[string]recipe{
 		},
 		consume: func(it fields) (string, error) { return Argon2Decrypt(it["password"], it["record"]) },
 	},
-	SignRecipe: {
-		replay: func(c fields) (string, error) {
-			pub, err := SignPublicKey(unhex(c["seed_hex"]))
-			if err != nil || hex.EncodeToString(pub) != c["public_hex"] {
-				return "", errors.New("public key mismatch")
-			}
-			return Sign(unhex(c["seed_hex"]), c["message"])
-		},
-		open: signOpen,
-		emit: func(i int) (fields, error) {
-			seed := unhex(randomHex(32))
-			pub, _ := SignPublicKey(seed)
-			sig, err := Sign(seed, plaintextFor(i))
-			return fields{"seed_hex": hex.EncodeToString(seed), "public_hex": hex.EncodeToString(pub), "message": plaintextFor(i), "record": sig}, err
-		},
-		consume: func(it fields) (string, error) {
-			pub, err := SignPublicKey(unhex(it["seed_hex"]))
-			if err != nil || hex.EncodeToString(pub) != it["public_hex"] {
-				return "", errors.New("public key mismatch")
-			}
-			return signOpen(it, "record")
-		},
-	},
+	SignRecipe:   signatureRecipe(SignPublicKey, Sign, Verify, false),
+	SignPqRecipe: signatureRecipe(SignPqPublicKey, SignPq, VerifyPq, true),
 	AeadRecipe: {
 		replay: func(c fields) (string, error) {
 			return AeadEncrypt(unhex(c["key_hex"]), c["plaintext"], c["aad"], unhex(c["nonce_hex"]))
@@ -158,8 +170,21 @@ func replay(name string, r recipe) {
 		if _, ok := c["signature_base64"]; ok {
 			field = "signature_base64"
 		}
-		if produced, err := r.replay(c); err != nil || produced != c[field] {
-			fail("%s case %s: produced %s (%v)", name, c["id"], produced, err)
+		produced, err := r.replay(c)
+		if err != nil {
+			fail("%s case %s: %v", name, c["id"], err)
+		}
+		if r.randomized {
+			own := fields{}
+			for k, v := range c {
+				own[k] = v
+			}
+			own[field] = produced
+			if got, err := r.open(own, field); err != nil || got != expected(c) {
+				fail("%s case %s: own output does not verify (%v)", name, c["id"], err)
+			}
+		} else if produced != c[field] {
+			fail("%s case %s: produced %s", name, c["id"], produced)
 		}
 		if got, err := r.open(c, field); err != nil || got != expected(c) {
 			fail("%s case %s: open mismatch (%v)", name, c["id"], err)

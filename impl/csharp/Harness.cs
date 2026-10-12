@@ -27,6 +27,13 @@ var recipes = new Dictionary<string, Recipe>
         i => { var key = RandomNumberGenerator.GetBytes(32); var aad = i % 2 == 0 ? $"aad-{i}" : ""; return new() { ["key_hex"] = Convert.ToHexString(key).ToLowerInvariant(), ["aad"] = aad, ["plaintext"] = PlaintextFor(i), ["record"] = AeadRecordV1.Encrypt(key, PlaintextFor(i), aad) }; },
         it => AeadRecordV1.Decrypt(Convert.FromHexString(it["key_hex"]), it["record"], it["aad"])),
 };
+if (SignDetachedPqV1.Available)
+    recipes[SignDetachedPqV1.Recipe] = new(
+        c => { if (Convert.ToHexString(SignDetachedPqV1.PublicKey(Convert.FromHexString(c["seed_hex"]))).ToLowerInvariant() != c["public_hex"]) throw new Exception($"{c["id"]}: public key mismatch"); return SignDetachedPqV1.Sign(Convert.FromHexString(c["seed_hex"]), c["message"]); },
+        (c, f) => { SignDetachedPqV1.Verify(Convert.FromHexString(c["public_hex"]), c["message"], c[f]); return c["message"]; },
+        i => { var seed = RandomNumberGenerator.GetBytes(32); return new() { ["seed_hex"] = Convert.ToHexString(seed).ToLowerInvariant(), ["public_hex"] = Convert.ToHexString(SignDetachedPqV1.PublicKey(seed)).ToLowerInvariant(), ["message"] = PlaintextFor(i), ["record"] = SignDetachedPqV1.Sign(seed, PlaintextFor(i)) }; },
+        it => { if (Convert.ToHexString(SignDetachedPqV1.PublicKey(Convert.FromHexString(it["seed_hex"]))).ToLowerInvariant() != it["public_hex"]) throw new Exception("public key mismatch"); SignDetachedPqV1.Verify(Convert.FromHexString(it["public_hex"]), it["message"], it["record"]); return it["message"]; },
+        Deterministic: false);
 
 void Replay(string name, Recipe r)
 {
@@ -36,7 +43,12 @@ void Replay(string name, Recipe r)
     {
         string produced = r.Replay(c);
         string field = c.ContainsKey("signature_base64") ? "signature_base64" : "output_base64";
-        if (produced != c[field]) throw new Exception($"{name} case {c["id"]}: produced {produced}");
+        if (!r.Deterministic)
+        {
+            var own = new Dictionary<string, string>(c) { [field] = produced };
+            if (r.Open(own, field) != Expected(c)) throw new Exception($"{name} case {c["id"]}: own output does not verify");
+        }
+        else if (produced != c[field]) throw new Exception($"{name} case {c["id"]}: produced {produced}");
         if (r.Open(c, field) != Expected(c)) throw new Exception($"{name} case {c["id"]}: open mismatch");
     }
     var negative = JsonSerializer.Deserialize<CaseFile>(File.ReadAllText(Path.Combine(vdir, "negative.json")), json)!.cases;
@@ -79,7 +91,8 @@ else
     else throw new Exception("usage: harness [<recipe> --emit N FILE | <recipe> --consume FILE]");
 }
 
+// Deterministic is false for a signature scheme whose output cannot equal the vector; own output is verified instead.
 record Recipe(Func<Dictionary<string, string>, string> Replay, Func<Dictionary<string, string>, string, string> Open,
-              Func<int, Dictionary<string, string>> Emit, Func<Dictionary<string, string>, string> Consume);
+              Func<int, Dictionary<string, string>> Emit, Func<Dictionary<string, string>, string> Consume, bool Deterministic = true);
 record CaseFile(List<Dictionary<string, string>> cases);
 record Batch(string recipe, string producer, List<Dictionary<string, string>> items);
