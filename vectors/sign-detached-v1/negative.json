@@ -1,0 +1,76 @@
+{
+ "recipe": "sign-detached-v1",
+ "note": "Every case must fail to verify. input_base64 is the signature under test.",
+ "cases": [
+  {
+   "id": "wrong-message",
+   "public_hex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+   "message": "The quick brown fox jumps over the lazy dog.",
+   "input_base64": "tZs0/KYL38dFI3U9PZkcahimiFiSAb9IWByxA/n3Phf385ep19mgLUnkYgXv+8NyLhvyGlxIoxH3E8v1ol+kBQ==",
+   "note": "one character appended to the message"
+  },
+  {
+   "id": "wrong-public-key",
+   "public_hex": "76a1592044a6e4f511265bca73a604d90b0529d1df602be30a19a9257660d1f5",
+   "message": "The quick brown fox jumps over the lazy dog",
+   "input_base64": "tZs0/KYL38dFI3U9PZkcahimiFiSAb9IWByxA/n3Phf385ep19mgLUnkYgXv+8NyLhvyGlxIoxH3E8v1ol+kBQ==",
+   "note": "a different key's public half"
+  },
+  {
+   "id": "signature-r-flipped",
+   "public_hex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+   "message": "The quick brown fox jumps over the lazy dog",
+   "input_base64": "tJs0/KYL38dFI3U9PZkcahimiFiSAb9IWByxA/n3Phf385ep19mgLUnkYgXv+8NyLhvyGlxIoxH3E8v1ol+kBQ==",
+   "note": "first byte of R flipped"
+  },
+  {
+   "id": "signature-s-flipped",
+   "public_hex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+   "message": "The quick brown fox jumps over the lazy dog",
+   "input_base64": "tZs0/KYL38dFI3U9PZkcahimiFiSAb9IWByxA/n3Phf385ep19mgLUnkYgXv+8NyLhvyGlxIoxH3E8v1ol+kBA==",
+   "note": "last byte of S flipped"
+  },
+  {
+   "id": "truncated",
+   "public_hex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+   "message": "The quick brown fox jumps over the lazy dog",
+   "input_base64": "tZs0/KYL38dFI3U9PZkcahimiFiSAb9IWByxA/n3Phf385ep19mgLUnkYgXv+8NyLhvyGlxIoxH3E8v1ol+k",
+   "note": "63-byte signature"
+  },
+  {
+   "id": "extended",
+   "public_hex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+   "message": "The quick brown fox jumps over the lazy dog",
+   "input_base64": "tZs0/KYL38dFI3U9PZkcahimiFiSAb9IWByxA/n3Phf385ep19mgLUnkYgXv+8NyLhvyGlxIoxH3E8v1ol+kBQA=",
+   "note": "65-byte signature"
+  },
+  {
+   "id": "empty",
+   "public_hex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+   "message": "The quick brown fox jumps over the lazy dog",
+   "input_base64": "",
+   "note": "empty signature"
+  },
+  {
+   "id": "not-base64",
+   "public_hex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+   "message": "The quick brown fox jumps over the lazy dog",
+   "input_base64": "@@@@",
+   "note": "not Base64"
+  },
+  {
+   "id": "no-domain-separation",
+   "public_hex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+   "message": "The quick brown fox jumps over the lazy dog",
+   "input_base64": "L9Tmzv4NOstG5Vbe7LZ0mcJ7qlc9W5vxOU7fufqO3Yzs5sKfA6a4J56lTlLrc1gyotQHnc03m6KLEh/jZb/LBA==",
+   "note": "a plain Ed25519 signature over the raw message, without the recipe prefix; an implementation that accepts it skipped the prefix"
+  },
+  {
+   "id": "swapped-halves",
+   "public_hex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+   "message": "The quick brown fox jumps over the lazy dog",
+   "input_base64": "9/OXqdfZoC1J5GIF7/vDci4b8hpcSKMR9xPL9aJfpAW1mzT8pgvfx0UjdT09mRxqGKaIWJIBv0hYHLED+fc+Fw==",
+   "note": "S placed before R"
+  }
+ ]
+}

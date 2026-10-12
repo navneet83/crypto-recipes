@@ -10,6 +10,8 @@ using CryptoRecipes;
 
 var root = Environment.GetEnvironmentVariable("RECIPES_ROOT") ?? ".";
 var json = new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+// Encryption vectors carry the plaintext, signature vectors the message.
+string Expected(Dictionary<string, string> c) => c.TryGetValue("message", out var m) ? m : c["plaintext"];
 string PlaintextFor(int i) => i % 3 == 0 ? "" : $"record {i} {new string('x', i * 7)} ünïcödé ✓";
 
 var recipes = new Dictionary<string, Recipe>
@@ -33,8 +35,9 @@ void Replay(string name, Recipe r)
     foreach (var c in cases)
     {
         string produced = r.Replay(c);
-        if (produced != c["output_base64"]) throw new Exception($"{name} case {c["id"]}: produced {produced}");
-        if (r.Open(c, "output_base64") != c["plaintext"]) throw new Exception($"{name} case {c["id"]}: decrypt mismatch");
+        string field = c.ContainsKey("signature_base64") ? "signature_base64" : "output_base64";
+        if (produced != c[field]) throw new Exception($"{name} case {c["id"]}: produced {produced}");
+        if (r.Open(c, field) != Expected(c)) throw new Exception($"{name} case {c["id"]}: open mismatch");
     }
     var negative = JsonSerializer.Deserialize<CaseFile>(File.ReadAllText(Path.Combine(vdir, "negative.json")), json)!.cases;
     foreach (var c in negative)
@@ -70,7 +73,7 @@ else
         var batch = JsonSerializer.Deserialize<Batch>(File.ReadAllText(args[2]), json)!;
         if (batch.recipe != name) throw new Exception("recipe mismatch");
         foreach (var it in batch.items)
-            if (r.Consume(it) != it["plaintext"]) throw new Exception($"csharp could not open a {name} record from {batch.producer}");
+            if (r.Consume(it) != Expected(it)) throw new Exception($"csharp could not open a {name} record from {batch.producer}");
         Console.WriteLine($"csharp: opened {batch.items.Count} {name} records from {batch.producer}");
     }
     else throw new Exception("usage: harness [<recipe> --emit N FILE | <recipe> --consume FILE]");

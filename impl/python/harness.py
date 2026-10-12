@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import aead_record_v1  # noqa: E402
 import pbe_record_pbkdf2_gcm_v1  # noqa: E402
 import pbe_record_v1  # noqa: E402
+import sign_detached_v1  # noqa: E402
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 
@@ -46,7 +47,29 @@ class Argon2(Pbe):
     r = pbe_record_v1
 
 
-RECIPES = {Pbe.r.RECIPE: Pbe(), Aead.r.RECIPE: Aead(), Argon2.r.RECIPE: Argon2()}
+class Sign:
+    r = sign_detached_v1
+    def replay(self, c):
+        assert self.r.public_key(bytes.fromhex(c["seed_hex"])).hex() == c["public_hex"], f"{c['id']}: public key mismatch"
+        return self.r.sign(bytes.fromhex(c["seed_hex"]), c["message"])
+    def open(self, c, field):
+        self.r.verify(bytes.fromhex(c["public_hex"]), c["message"], c[field])
+        return c["message"]
+    def emit(self, i):
+        seed = os.urandom(32)
+        return {"seed_hex": seed.hex(), "public_hex": self.r.public_key(seed).hex(), "message": _plaintext(i), "record": self.r.sign(seed, _plaintext(i))}
+    def consume(self, it):
+        assert self.r.public_key(bytes.fromhex(it["seed_hex"])).hex() == it["public_hex"], "public key mismatch"
+        self.r.verify(bytes.fromhex(it["public_hex"]), it["message"], it["record"])
+        return it["message"]
+
+
+RECIPES = {Pbe.r.RECIPE: Pbe(), Aead.r.RECIPE: Aead(), Argon2.r.RECIPE: Argon2(), Sign.r.RECIPE: Sign()}
+
+
+def expected(c):
+    """Encryption vectors carry the plaintext, signature vectors the message."""
+    return c["message"] if "message" in c else c["plaintext"]
 
 
 def replay(name, impl):
@@ -55,8 +78,9 @@ def replay(name, impl):
         cases = json.load(f)["cases"]
     for c in cases:
         produced = impl.replay(c)
-        assert produced == c["output_base64"], f"{name} case {c['id']}: produced {produced}"
-        assert impl.open(c, "output_base64") == c["plaintext"], f"{name} case {c['id']}: decrypt mismatch"
+        field = "signature_base64" if "signature_base64" in c else "output_base64"
+        assert produced == c[field], f"{name} case {c['id']}: produced {produced}"
+        assert impl.open(c, field) == expected(c), f"{name} case {c['id']}: open mismatch"
     with open(os.path.join(vdir, "negative.json")) as f:
         negative = json.load(f)["cases"]
     for c in negative:
@@ -87,7 +111,7 @@ def main(argv):
             data = json.load(f)
         assert data["recipe"] == name, "recipe mismatch"
         for it in data["items"]:
-            assert impl.consume(it) == it["plaintext"], f"python could not open a {name} record from {data['producer']}"
+            assert impl.consume(it) == expected(it), f"python could not open a {name} record from {data['producer']}"
         print(f"python: opened {len(data['items'])} {name} records from {data['producer']}")
 
 

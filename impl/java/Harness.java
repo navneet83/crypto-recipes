@@ -44,6 +44,27 @@ public final class Harness {
         });
     }
 
+    static {
+        RECIPES.put(SignDetachedV1.RECIPE, new Recipe() {
+            public String replay(Map<String, String> c) throws Exception {
+                if (!toHex(SignDetachedV1.publicKey(hex(c.get("seed_hex")))).equals(c.get("public_hex"))) throw new IllegalStateException(c.get("id") + ": public key mismatch");
+                return SignDetachedV1.sign(hex(c.get("seed_hex")), c.get("message"));
+            }
+            public String open(Map<String, String> c, String f) throws Exception { SignDetachedV1.verify(hex(c.get("public_hex")), c.get("message"), c.get(f)); return c.get("message"); }
+            public Map<String, String> emit(int i) throws Exception {
+                byte[] seed = new byte[32]; RANDOM.nextBytes(seed);
+                return Map.of("seed_hex", toHex(seed), "public_hex", toHex(SignDetachedV1.publicKey(seed)), "message", plaintextFor(i), "record", SignDetachedV1.sign(seed, plaintextFor(i)));
+            }
+            public String consume(Map<String, String> it) throws Exception {
+                if (!toHex(SignDetachedV1.publicKey(hex(it.get("seed_hex")))).equals(it.get("public_hex"))) throw new IllegalStateException("public key mismatch");
+                return open(it, "record");
+            }
+        });
+    }
+
+    /** Encryption vectors carry the plaintext, signature vectors the message. */
+    static String expected(Map<String, String> c) { return c.containsKey("message") ? c.get("message") : c.get("plaintext"); }
+
     static String plaintextFor(int i) { return i % 3 == 0 ? "" : "record " + i + " " + "x".repeat(i * 7) + " ünïcödé ✓"; }
 
     static byte[] hex(String s) {
@@ -116,8 +137,9 @@ public final class Harness {
         List<Map<String, String>> cases = objects(Files.readString(vdir.resolve("cases.json")), new HashMap<>());
         for (var c : cases) {
             String produced = r.replay(c);
-            if (!produced.equals(c.get("output_base64"))) throw new IllegalStateException(name + " case " + c.get("id") + ": produced " + produced);
-            if (!r.open(c, "output_base64").equals(c.get("plaintext"))) throw new IllegalStateException(name + " case " + c.get("id") + ": decrypt mismatch");
+            String field = c.containsKey("signature_base64") ? "signature_base64" : "output_base64";
+            if (!produced.equals(c.get(field))) throw new IllegalStateException(name + " case " + c.get("id") + ": produced " + produced);
+            if (!r.open(c, field).equals(expected(c))) throw new IllegalStateException(name + " case " + c.get("id") + ": open mismatch");
         }
         List<Map<String, String>> negative = objects(Files.readString(vdir.resolve("negative.json")), new HashMap<>());
         for (var c : negative) {
@@ -159,7 +181,7 @@ public final class Harness {
             List<Map<String, String>> items = objects(Files.readString(Path.of(args[2])), top);
             if (!name.equals(top.get("recipe"))) throw new IllegalStateException("recipe mismatch");
             for (var it : items)
-                if (!r.consume(it).equals(it.get("plaintext"))) throw new IllegalStateException("java could not open a " + name + " record from " + top.get("producer"));
+                if (!r.consume(it).equals(expected(it))) throw new IllegalStateException("java could not open a " + name + " record from " + top.get("producer"));
             System.out.println("java: opened " + items.size() + " " + name + " records from " + top.get("producer"));
         } else {
             throw new IllegalArgumentException("usage: Harness [<recipe> --emit N FILE | <recipe> --consume FILE]");

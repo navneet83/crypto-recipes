@@ -99,9 +99,40 @@ Same shape as the PBKDF2 recipe. The two are told apart by which recipe the appl
 
 Planned. HPKE base mode (RFC 9180) with `DHKEM(X25519, HKDF-SHA256)`, `HKDF-SHA256`, `AES-256-GCM`, info string `crypto-recipes/hpke-envelope-v1`. The post-quantum variant uses the hybrid X25519 + ML-KEM-768 KEM from the IETF draft current at the time of writing; the page will record the exact draft.
 
-## sign-detached-v1, sign-detached-pq-v1
+## sign-detached-v1
 
-Planned. Ed25519 and ML-DSA-44 detached signatures over `"crypto-recipes/sign-detached-v1" || 0x00 || message`.
+**Task.** Sign a message with a key you hold and let anyone with the public key check it: release artifacts, webhooks, tokens, audit records. The signature travels next to the message, not around it.
+
+**Not for.** Encryption (nothing here hides the message), long-lived signatures that must survive a cryptographically relevant quantum computer (see `sign-detached-pq-v1`), or protocols that already define their own signing input (JWS, COSE, SSH, X.509); use those as they are.
+
+**Keys.** Ed25519 (RFC 8032). The private key is the 32-byte seed; the public key is the 32-byte encoded point. Both are Base64 when transported. Libraries show the private key in several shapes: a 32-byte seed (CryptoKit, pyca), a 64-byte seed-plus-public (Go), or a PKCS#8 blob (JCA, WebCrypto). They are all the same key; store the seed and wrap it as the library needs. The two fixed DER prefixes for PKCS#8 and X.509 are in the TypeScript and Java files.
+
+**Input.** The signed bytes are
+
+```
+"crypto-recipes/sign-detached-v1" || 0x00 || message
+```
+
+A signature made for this recipe therefore means nothing to another protocol that signs raw bytes with the same key, and a raw signature from elsewhere does not pass here. The negative case `no-domain-separation` is a plain Ed25519 signature over the message; an implementation that accepts it forgot the prefix.
+
+**Signature.** The 64 raw Ed25519 bytes, Base64. Verification fails, by exception rather than by a boolean a caller might ignore, for anything that is not exactly 64 bytes.
+
+**Vectors.** [`vectors/sign-detached-v1/`](vectors/sign-detached-v1/). Every implementation must derive the vector's public key from its seed and must verify the vector's signature. RFC 8032 signing is deterministic, so Python, TypeScript, Go and Java also reproduce the signatures byte for byte. CryptoKit does not: Apple randomizes Ed25519 signing, which is permitted and verifies everywhere, so the Swift harness checks that its own signatures verify instead of comparing bytes. Case `rfc8032-key-1` uses the first key pair of RFC 8032 section 7.1.
+
+**Implementations.**
+
+| Language | File | Ed25519 from |
+|---|---|---|
+| Swift | [`impl/swift/Sources/Recipes/SignDetachedV1.swift`](impl/swift/Sources/Recipes/SignDetachedV1.swift) | CryptoKit (randomized signatures) |
+| TypeScript | [`impl/typescript/sign_detached_v1.mjs`](impl/typescript/sign_detached_v1.mjs) | WebCrypto, Node 20+ and current browsers |
+| Python | [`impl/python/sign_detached_v1.py`](impl/python/sign_detached_v1.py) | pyca/cryptography |
+| Go | [`impl/go/sign_detached_v1.go`](impl/go/sign_detached_v1.go) | `crypto/ed25519` |
+| Java, Kotlin | [`impl/java/SignDetachedV1.java`](impl/java/SignDetachedV1.java) | JCA, Java 15+, Android API 33+; the JDK does not expose the public half of a private key, so the pair is regenerated from the seed |
+| C# | none | `System.Security.Cryptography` has no Ed25519 as of .NET 10. Verifying with a dependency-free .NET is not possible; NSec (libsodium) or Bouncy Castle are the usual choices, and a .NET service that only needs to verify can also be handed ML-DSA signatures instead once `sign-detached-pq-v1` exists. |
+
+## sign-detached-pq-v1
+
+Planned. ML-DSA-65 (FIPS 204), the parameter set every platform that ships ML-DSA has in common; the scope said 44, which CryptoKit does not offer. The same domain-separated input, carried in the FIPS 204 context string where the platform exposes it.
 
 ## password-hash-v1
 

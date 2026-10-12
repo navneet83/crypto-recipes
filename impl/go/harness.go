@@ -10,6 +10,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -38,7 +39,22 @@ func unhex(s string) []byte { b, _ := hex.DecodeString(s); return b }
 
 func randomHex(n int) string { b := make([]byte, n); rand.Read(b); return hex.EncodeToString(b) }
 
-var recipeOrder = []string{Recipe, AeadRecipe, Argon2Recipe}
+var recipeOrder = []string{Recipe, AeadRecipe, Argon2Recipe, SignRecipe}
+
+// Encryption vectors carry the plaintext, signature vectors the message.
+func expected(c fields) string {
+	if m, ok := c["message"]; ok {
+		return m
+	}
+	return c["plaintext"]
+}
+
+func signOpen(c fields, field string) (string, error) {
+	if err := Verify(unhex(c["public_hex"]), c["message"], c[field]); err != nil {
+		return "", err
+	}
+	return c["message"], nil
+}
 
 var recipes = map[string]recipe{
 	Recipe: {
@@ -64,6 +80,29 @@ var recipes = map[string]recipe{
 			return fields{"password": password, "plaintext": plaintextFor(i), "record": rec}, err
 		},
 		consume: func(it fields) (string, error) { return Argon2Decrypt(it["password"], it["record"]) },
+	},
+	SignRecipe: {
+		replay: func(c fields) (string, error) {
+			pub, err := SignPublicKey(unhex(c["seed_hex"]))
+			if err != nil || hex.EncodeToString(pub) != c["public_hex"] {
+				return "", errors.New("public key mismatch")
+			}
+			return Sign(unhex(c["seed_hex"]), c["message"])
+		},
+		open: signOpen,
+		emit: func(i int) (fields, error) {
+			seed := unhex(randomHex(32))
+			pub, _ := SignPublicKey(seed)
+			sig, err := Sign(seed, plaintextFor(i))
+			return fields{"seed_hex": hex.EncodeToString(seed), "public_hex": hex.EncodeToString(pub), "message": plaintextFor(i), "record": sig}, err
+		},
+		consume: func(it fields) (string, error) {
+			pub, err := SignPublicKey(unhex(it["seed_hex"]))
+			if err != nil || hex.EncodeToString(pub) != it["public_hex"] {
+				return "", errors.New("public key mismatch")
+			}
+			return signOpen(it, "record")
+		},
 	},
 	AeadRecipe: {
 		replay: func(c fields) (string, error) {
@@ -115,11 +154,15 @@ func replay(name string, r recipe) {
 	var cases, negative caseFile
 	readJSON(filepath.Join(vdir, "cases.json"), &cases)
 	for _, c := range cases.Cases {
-		if produced, err := r.replay(c); err != nil || produced != c["output_base64"] {
+		field := "output_base64"
+		if _, ok := c["signature_base64"]; ok {
+			field = "signature_base64"
+		}
+		if produced, err := r.replay(c); err != nil || produced != c[field] {
 			fail("%s case %s: produced %s (%v)", name, c["id"], produced, err)
 		}
-		if got, err := r.open(c, "output_base64"); err != nil || got != c["plaintext"] {
-			fail("%s case %s: decrypt mismatch (%v)", name, c["id"], err)
+		if got, err := r.open(c, field); err != nil || got != expected(c) {
+			fail("%s case %s: open mismatch (%v)", name, c["id"], err)
 		}
 	}
 	readJSON(filepath.Join(vdir, "negative.json"), &negative)
@@ -171,7 +214,7 @@ func main() {
 			fail("recipe mismatch")
 		}
 		for _, it := range b.Items {
-			if got, err := r.consume(it); err != nil || got != it["plaintext"] {
+			if got, err := r.consume(it); err != nil || got != expected(it) {
 				fail("go could not open a %s record from %s: %v", name, b.Producer, err)
 			}
 		}

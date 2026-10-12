@@ -12,6 +12,8 @@ struct Recipe {
     let open: ([String: String], String) throws -> String
     let emit: (Int) throws -> [String: String]
     let consume: ([String: String]) throws -> String
+    /// CryptoKit's Ed25519 signing is randomized, so its output cannot equal the vector; it is verified instead.
+    var deterministic = true
 }
 
 func hex(_ s: String) -> Data {
@@ -34,7 +36,20 @@ let recipes: [(String, Recipe)] = [
         open: { c, f in try AeadRecordV1.decrypt(key: hex(c["key_hex"]!), text: c[f]!, aad: c["aad"]!) },
         emit: { i in let key = randomBytes(32); let aad = i % 2 == 0 ? "aad-\(i)" : ""; return ["key_hex": toHex(key), "aad": aad, "plaintext": plaintextFor(i), "record": try AeadRecordV1.encrypt(key: key, plaintext: plaintextFor(i), aad: aad)] },
         consume: { it in try AeadRecordV1.decrypt(key: hex(it["key_hex"]!), text: it["record"]!, aad: it["aad"]!) })),
+    (SignDetachedV1.recipe, Recipe(
+        replay: { c in
+            guard toHex(try SignDetachedV1.publicKey(seed: hex(c["seed_hex"]!))) == c["public_hex"] else { fatalError("\(c["id"]!): public key mismatch") }
+            return try SignDetachedV1.sign(seed: hex(c["seed_hex"]!), message: c["message"]!) },
+        open: { c, f in try SignDetachedV1.verify(publicKey: hex(c["public_hex"]!), message: c["message"]!, signature: c[f]!); return c["message"]! },
+        emit: { i in let seed = randomBytes(32); return ["seed_hex": toHex(seed), "public_hex": toHex(try SignDetachedV1.publicKey(seed: seed)), "message": plaintextFor(i), "record": try SignDetachedV1.sign(seed: seed, message: plaintextFor(i))] },
+        consume: { it in
+            guard toHex(try SignDetachedV1.publicKey(seed: hex(it["seed_hex"]!))) == it["public_hex"] else { fatalError("public key mismatch") }
+            try SignDetachedV1.verify(publicKey: hex(it["public_hex"]!), message: it["message"]!, signature: it["record"]!); return it["message"]! },
+        deterministic: false)),
 ]
+
+/// Encryption vectors carry the plaintext, signature vectors the message.
+func expected(_ c: [String: String]) -> String { c["message"] ?? c["plaintext"]! }
 
 struct CaseFile: Decodable { let cases: [[String: String]] }
 struct Batch: Codable { let recipe, producer: String; let items: [[String: String]] }
@@ -46,8 +61,14 @@ func replay(_ name: String, _ r: Recipe) throws {
     let cases = try JSONDecoder().decode(CaseFile.self, from: Data(contentsOf: vdir.appendingPathComponent("cases.json"))).cases
     for c in cases {
         let produced = try r.replay(c)
-        guard produced == c["output_base64"] else { fatalError("\(name) case \(c["id"]!): produced \(produced)") }
-        guard try r.open(c, "output_base64") == c["plaintext"] else { fatalError("\(name) case \(c["id"]!): decrypt mismatch") }
+        let field = c["signature_base64"] != nil ? "signature_base64" : "output_base64"
+        if r.deterministic {
+            guard produced == c[field] else { fatalError("\(name) case \(c["id"]!): produced \(produced)") }
+        } else {
+            var own = c; own[field] = produced
+            guard try r.open(own, field) == expected(c) else { fatalError("\(name) case \(c["id"]!): own output does not verify") }
+        }
+        guard try r.open(c, field) == expected(c) else { fatalError("\(name) case \(c["id"]!): open mismatch") }
     }
     let negative = try JSONDecoder().decode(CaseFile.self, from: Data(contentsOf: vdir.appendingPathComponent("negative.json"))).cases
     for c in negative {
@@ -72,7 +93,7 @@ if args == ["--list"] {
     } else if args.count == 3, args[1] == "--consume" {
         let batch = try JSONDecoder().decode(Batch.self, from: Data(contentsOf: URL(fileURLWithPath: args[2])))
         guard batch.recipe == name else { fatalError("recipe mismatch") }
-        for it in batch.items { guard try r.consume(it) == it["plaintext"] else { fatalError("swift could not open a \(name) record from \(batch.producer)") } }
+        for it in batch.items { guard try r.consume(it) == expected(it) else { fatalError("swift could not open a \(name) record from \(batch.producer)") } }
         print("swift: opened \(batch.items.count) \(name) records from \(batch.producer)")
     } else {
         fatalError("usage: harness [<recipe> --emit N FILE | <recipe> --consume FILE]")
