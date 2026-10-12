@@ -51,10 +51,10 @@ jobs:
       - run: .venv/bin/python tools/xaes_c2sp_check.py && .venv/bin/python tools/argon2_rfc9106_check.py
       - run: LANGS="typescript python go java csharp" sh tools/crosscheck.sh
   # .NET enables ML-DSA only where the OS has it: OpenSSL 3.5+ on Linux. ubuntu-latest ships OpenSSL 3.0, so the C#
-  # post-quantum file runs here, in the .NET 10 SDK image (Debian 13, OpenSSL 3.5), against the committed vectors.
+  # post-quantum file runs here, in the Alpine 3.24 .NET 10 SDK image (OpenSSL 3.5), against the committed vectors.
   dotnet-pq:
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/dotnet/sdk:10.0
+    container: mcr.microsoft.com/dotnet/sdk:10.0-alpine3.24
     steps:
       - uses: actions/checkout@v4
       - run: openssl version
