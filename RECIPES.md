@@ -159,7 +159,7 @@ with an empty FIPS 204 context string. FIPS 204 has a context parameter made for
 | Python | [`impl/python/sign_detached_pq_v1.py`](impl/python/sign_detached_pq_v1.py) | pyca/cryptography 46+ (OpenSSL 3.5) |
 | Go | [`impl/go/sign_detached_pq_v1.go`](impl/go/sign_detached_pq_v1.go) | `crypto/mldsa`, Go 1.27 |
 | Java, Kotlin | [`impl/java/SignDetachedPqV1.java`](impl/java/SignDetachedPqV1.java) | JCA, Java 24+ |
-| C# | [`impl/csharp/SignDetachedPqV1.cs`](impl/csharp/SignDetachedPqV1.cs) | `System.Security.Cryptography.MLDsa`, .NET 10, Linux and Windows only |
+| C# | [`impl/csharp/SignDetachedPqV1.cs`](impl/csharp/SignDetachedPqV1.cs) | `System.Security.Cryptography.MLDsa`, .NET 10, Linux with OpenSSL 3.5+ and Windows only; CI checks it in the Alpine 3.24 .NET image |
 
 ## password-hash-v1
 
