@@ -1,5 +1,5 @@
 // Runs the recipes over their vectors, emits random records, or consumes another implementation's records.
-// Multi-file source launch (Java 22+): java -Drecipes.root=<checkout> impl/java/Harness.java [<recipe> --emit N FILE | <recipe> --consume FILE]
+// Multi-file source launch (Java 22+): java -Drecipes.root=<checkout> impl/java/Harness.java [--list | <recipe> --emit N FILE | <recipe> --consume FILE]
 // A tiny JSON reader keeps this dependency-free; it handles the vector files only.
 
 import java.nio.file.Files;
@@ -129,6 +129,10 @@ public final class Harness {
     }
 
     public static void main(String[] args) throws Exception {
+        if (args.length == 1 && args[0].equals("--list")) {
+            System.out.println(String.join("\n", RECIPES.keySet()));
+            return;
+        }
         if (args.length == 0) {
             for (var e : RECIPES.entrySet()) replay(e.getKey(), e.getValue());
             return;

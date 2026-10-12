@@ -1,0 +1,78 @@
+{
+ "recipe": "pbe-record-v1",
+ "note": "Every case must fail to decrypt. An implementation that returns any plaintext for any of them does not conform.",
+ "cases": [
+  {
+   "id": "wrong-password",
+   "password": "correct horse battery stapl",
+   "input_base64": "AQABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhtIBWgZUDqc+55CKXIoygdWKmV9K2U3qPwNBIPNHplHzRLYBtOMBajAtDPOJqTZkVGH4bghGDzCzLmpMA==",
+   "note": "password off by one character"
+  },
+  {
+   "id": "tag-flipped",
+   "password": "correct horse battery staple",
+   "input_base64": "AQABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhtIBWgZUDqc+55CKXIoygdWKmV9K2U3qPwNBIPNHplHzRLYBtOMBajAtDPOJqTZkVGH4bghGDzCzLmpMQ==",
+   "note": "last byte of the tag flipped"
+  },
+  {
+   "id": "ciphertext-flipped",
+   "password": "correct horse battery staple",
+   "input_base64": "AQABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhtJBWgZUDqc+55CKXIoygdWKmV9K2U3qPwNBIPNHplHzRLYBtOMBajAtDPOJqTZkVGH4bghGDzCzLmpMA==",
+   "note": "first ciphertext byte flipped"
+  },
+  {
+   "id": "salt-flipped",
+   "password": "correct horse battery staple",
+   "input_base64": "AQEBAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhtIBWgZUDqc+55CKXIoygdWKmV9K2U3qPwNBIPNHplHzRLYBtOMBajAtDPOJqTZkVGH4bghGDzCzLmpMA==",
+   "note": "first salt byte flipped, so the key differs"
+  },
+  {
+   "id": "nonce-flipped",
+   "password": "correct horse battery staple",
+   "input_base64": "AQABAgMEBQYHCAkKCwwNDg8RERITFBUWFxgZGhtIBWgZUDqc+55CKXIoygdWKmV9K2U3qPwNBIPNHplHzRLYBtOMBajAtDPOJqTZkVGH4bghGDzCzLmpMA==",
+   "note": "first nonce byte flipped"
+  },
+  {
+   "id": "truncated-tag",
+   "password": "correct horse battery staple",
+   "input_base64": "AQABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhtIBWgZUDqc+55CKXIoygdWKmV9K2U3qPwNBIPNHplHzRLYBtOMBajAtDPOJqTZkVGH4bghGDzCzLmp",
+   "note": "one byte of the tag missing"
+  },
+  {
+   "id": "truncated-to-header",
+   "password": "correct horse battery staple",
+   "input_base64": "AQABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhs=",
+   "note": "no ciphertext and no tag"
+  },
+  {
+   "id": "wrong-version",
+   "password": "correct horse battery staple",
+   "input_base64": "AgABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhtIBWgZUDqc+55CKXIoygdWKmV9K2U3qPwNBIPNHplHzRLYBtOMBajAtDPOJqTZkVGH4bghGDzCzLmpMA==",
+   "note": "version byte 0x02"
+  },
+  {
+   "id": "no-version",
+   "password": "correct horse battery staple",
+   "input_base64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaG0gFaBlQOpz7nkIpcijKB1YqZX0rZTeo/A0Eg80emUfNEtgG04wFqMC0M84mpNmRUYfhuCEYPMLMuakw",
+   "note": "layout without the leading byte"
+  },
+  {
+   "id": "empty-input",
+   "password": "correct horse battery staple",
+   "input_base64": "",
+   "note": "empty string"
+  },
+  {
+   "id": "not-base64",
+   "password": "correct horse battery staple",
+   "input_base64": "@@@@",
+   "note": "not Base64"
+  },
+  {
+   "id": "tag-moved",
+   "password": "correct horse battery staple",
+   "input_base64": "AQABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhsmpNmRUYfhuCEYPMLMuakwSAVoGVA6nPueQilyKMoHViplfStlN6j8DQSDzR6ZR80S2AbTjAWowLQzzg==",
+   "note": "tag placed before the ciphertext"
+  }
+ ]
+}

@@ -9,13 +9,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: stable
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -25,3 +25,28 @@ jobs:
           dotnet-version: 10.0.x
       - run: python3 -m venv .venv && .venv/bin/pip install cryptography
       - run: sh tools/crosscheck.sh
+  # Linux has no CryptoKit, so Swift is left out here. .NET's post-quantum classes are only enabled on
+  # Linux and Windows, which is why this job exists at all.
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: python3 -m venv .venv && .venv/bin/pip install cryptography
+      - run: .venv/bin/python tools/xaes_c2sp_check.py && .venv/bin/python tools/argon2_rfc9106_check.py
+      - run: LANGS="typescript python go java csharp" sh tools/crosscheck.sh

@@ -1,5 +1,6 @@
 // Runs the recipes over their vectors, emits random records, or consumes another implementation's records.
 //   swift run harness                            replay cases.json and negative.json for every recipe
+//   swift run harness --list                     print the recipes this implementation supports, one per line
 //   swift run harness <recipe> --emit N FILE     write N random records for the cross-language check
 //   swift run harness <recipe> --consume FILE    open records produced by another implementation
 // RECIPES_ROOT points at the checkout (default: two directories up from the package).
@@ -56,7 +57,9 @@ func replay(_ name: String, _ r: Recipe) throws {
 }
 
 let args = Array(CommandLine.arguments.dropFirst())
-if args.isEmpty {
+if args == ["--list"] {
+    print(recipes.map { $0.0 }.joined(separator: "\n"))
+} else if args.isEmpty {
     for (name, r) in recipes { try replay(name, r) }
 } else {
     let name = args[0]

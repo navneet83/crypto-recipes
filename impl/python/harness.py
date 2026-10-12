@@ -1,6 +1,7 @@
 """Runs the recipes over their vectors, emits random records, or consumes another implementation's records.
 
     harness.py                         replay cases.json and negative.json for every recipe
+    harness.py --list                  print the recipes this implementation supports, one per line
     harness.py <recipe> --emit N FILE  write N random records for the cross-language check
     harness.py <recipe> --consume FILE open records produced by another implementation
 """
@@ -12,6 +13,7 @@ import uuid
 sys.path.insert(0, os.path.dirname(__file__))
 import aead_record_v1  # noqa: E402
 import pbe_record_pbkdf2_gcm_v1  # noqa: E402
+import pbe_record_v1  # noqa: E402
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 
@@ -40,7 +42,11 @@ class Aead:
     def consume(self, it): return self.r.decrypt(bytes.fromhex(it["key_hex"]), it["record"], it["aad"])
 
 
-RECIPES = {Pbe.r.RECIPE: Pbe(), Aead.r.RECIPE: Aead()}
+class Argon2(Pbe):
+    r = pbe_record_v1
+
+
+RECIPES = {Pbe.r.RECIPE: Pbe(), Aead.r.RECIPE: Aead(), Argon2.r.RECIPE: Argon2()}
 
 
 def replay(name, impl):
@@ -63,6 +69,9 @@ def replay(name, impl):
 
 
 def main(argv):
+    if argv == ["--list"]:
+        print("\n".join(RECIPES))
+        return
     if not argv:
         for name, impl in RECIPES.items():
             replay(name, impl)

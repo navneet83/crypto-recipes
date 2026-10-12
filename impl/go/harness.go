@@ -1,6 +1,7 @@
 // Runs the recipes over their vectors, emits random records, or consumes another implementation's records.
 //
 //	go run .                            replay cases.json and negative.json for every recipe
+//	go run . --list                     print the recipes this implementation supports, one per line
 //	go run . <recipe> --emit N FILE     write N random records for the cross-language check
 //	go run . <recipe> --consume FILE    open records produced by another implementation
 package main
@@ -37,6 +38,8 @@ func unhex(s string) []byte { b, _ := hex.DecodeString(s); return b }
 
 func randomHex(n int) string { b := make([]byte, n); rand.Read(b); return hex.EncodeToString(b) }
 
+var recipeOrder = []string{Recipe, AeadRecipe, Argon2Recipe}
+
 var recipes = map[string]recipe{
 	Recipe: {
 		replay: func(c fields) (string, error) {
@@ -49,6 +52,18 @@ var recipes = map[string]recipe{
 			return fields{"password": password, "plaintext": plaintextFor(i), "record": rec}, err
 		},
 		consume: func(it fields) (string, error) { return Decrypt(it["password"], it["record"]) },
+	},
+	Argon2Recipe: {
+		replay: func(c fields) (string, error) {
+			return Argon2Encrypt(c["password"], c["plaintext"], unhex(c["salt_hex"]), unhex(c["nonce_hex"]))
+		},
+		open: func(c fields, field string) (string, error) { return Argon2Decrypt(c["password"], c[field]) },
+		emit: func(i int) (fields, error) {
+			password := fmt.Sprintf("pw-%d-%s", i, randomHex(16))
+			rec, err := Argon2Encrypt(password, plaintextFor(i), nil, nil)
+			return fields{"password": password, "plaintext": plaintextFor(i), "record": rec}, err
+		},
+		consume: func(it fields) (string, error) { return Argon2Decrypt(it["password"], it["record"]) },
 	},
 	AeadRecipe: {
 		replay: func(c fields) (string, error) {
@@ -118,8 +133,12 @@ func replay(name string, r recipe) {
 
 func main() {
 	args := os.Args[1:]
+	if len(args) == 1 && args[0] == "--list" {
+		fmt.Println(strings.Join(recipeOrder, "\n"))
+		return
+	}
 	if len(args) == 0 {
-		for _, name := range []string{Recipe, AeadRecipe} {
+		for _, name := range recipeOrder {
 			replay(name, recipes[name])
 		}
 		return

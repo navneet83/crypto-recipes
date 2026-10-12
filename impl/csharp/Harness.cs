@@ -1,5 +1,6 @@
 // Runs the recipes over their vectors, emits random records, or consumes another implementation's records.
 //   harness                            replay cases.json and negative.json for every recipe
+//   harness --list                     print the recipes this implementation supports, one per line
 //   harness <recipe> --emit N FILE     write N random records for the cross-language check
 //   harness <recipe> --consume FILE    open records produced by another implementation
 // RECIPES_ROOT points at the checkout (default: current directory).
@@ -45,7 +46,11 @@ void Replay(string name, Recipe r)
     Console.WriteLine($"csharp: {cases.Count} cases and {negative.Count} negative cases OK for {name}");
 }
 
-if (args.Length == 0)
+if (args.Length == 1 && args[0] == "--list")
+{
+    Console.WriteLine(string.Join("\n", recipes.Keys));
+}
+else if (args.Length == 0)
 {
     foreach (var (name, r) in recipes) Replay(name, r);
 }

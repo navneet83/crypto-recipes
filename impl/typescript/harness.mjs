@@ -1,29 +1,33 @@
 // Runs the recipes over their vectors, emits random records, or consumes another implementation's records.
 //   harness.mjs                          replay cases.json and negative.json for every recipe
+//   harness.mjs --list                   print the recipes this implementation supports, one per line
 //   harness.mjs <recipe> --emit N FILE   write N random records for the cross-language check
 //   harness.mjs <recipe> --consume FILE  open records produced by another implementation
 import { readFile, writeFile } from "node:fs/promises";
 import * as pbe from "./pbe_record_pbkdf2_gcm_v1.mjs";
 import * as aead from "./aead_record_v1.mjs";
+import * as argon2 from "./pbe_record_v1.mjs";
 
 const hex = h => Uint8Array.from(h.match(/../g) ?? [], b => parseInt(b, 16));
 const toHex = b => [...b].map(x => x.toString(16).padStart(2, "0")).join("");
 const plaintextFor = i => i % 3 === 0 ? "" : `record ${i} ${"x".repeat(i * 7)} ünïcödé ✓`;
 const root = new URL("../../", import.meta.url);
 
+const passwordRecipe = r => ({
+    replay: c => r.encrypt(c.password, c.plaintext, hex(c.salt_hex), hex(c.nonce_hex)),
+    open: (c, field) => r.decrypt(c.password, c[field]),
+    emit: async i => { const password = `pw-${i}-${crypto.randomUUID()}`; return { password, plaintext: plaintextFor(i), record: await r.encrypt(password, plaintextFor(i)) }; },
+    consume: it => r.decrypt(it.password, it.record),
+});
 const RECIPES = {
-    [pbe.RECIPE]: {
-        replay: c => pbe.encrypt(c.password, c.plaintext, hex(c.salt_hex), hex(c.nonce_hex)),
-        open: (c, field) => pbe.decrypt(c.password, c[field]),
-        emit: async i => { const password = `pw-${i}-${crypto.randomUUID()}`; return { password, plaintext: plaintextFor(i), record: await pbe.encrypt(password, plaintextFor(i)) }; },
-        consume: it => pbe.decrypt(it.password, it.record),
-    },
+    [pbe.RECIPE]: passwordRecipe(pbe),
     [aead.RECIPE]: {
         replay: c => aead.encrypt(hex(c.key_hex), c.plaintext, c.aad, hex(c.nonce_hex)),
         open: (c, field) => aead.decrypt(hex(c.key_hex), c[field], c.aad),
         emit: async i => { const key = crypto.getRandomValues(new Uint8Array(32)); const aad = i % 2 ? "" : `aad-${i}`; return { key_hex: toHex(key), aad, plaintext: plaintextFor(i), record: await aead.encrypt(key, plaintextFor(i), aad) }; },
         consume: it => aead.decrypt(hex(it.key_hex), it.record, it.aad),
     },
+    ...(argon2.available ? { [argon2.RECIPE]: passwordRecipe(argon2) } : {}),
 };
 
 async function replay(name, impl) {
@@ -44,7 +48,9 @@ async function replay(name, impl) {
 }
 
 const args = process.argv.slice(2);
-if (args.length === 0) {
+if (args[0] === "--list") {
+    console.log(Object.keys(RECIPES).join("\n"));
+} else if (args.length === 0) {
     for (const [name, impl] of Object.entries(RECIPES)) await replay(name, impl);
 } else {
     const name = args[0], impl = RECIPES[name];
