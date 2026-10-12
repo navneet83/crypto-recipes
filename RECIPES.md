@@ -40,11 +40,11 @@ Planned. Argon2id (64 MiB, 3 iterations, 1 lane) and XAES-256-GCM (C2SP) with a 
 
 ## hpke-envelope-v1, hpke-envelope-pq-v1
 
-Planned. HPKE base mode (RFC 9180) with `DHKEM(X25519, HKDF-SHA256)`, `HKDF-SHA256`, `AES-256-GCM`, info string `cryptorecipes/hpke-envelope-v1`. The post-quantum variant uses the hybrid X25519 + ML-KEM-768 KEM from the IETF draft current at the time of writing; the page will record the exact draft.
+Planned. HPKE base mode (RFC 9180) with `DHKEM(X25519, HKDF-SHA256)`, `HKDF-SHA256`, `AES-256-GCM`, info string `crypto-recipes/hpke-envelope-v1`. The post-quantum variant uses the hybrid X25519 + ML-KEM-768 KEM from the IETF draft current at the time of writing; the page will record the exact draft.
 
 ## sign-detached-v1, sign-detached-pq-v1
 
-Planned. Ed25519 and ML-DSA-44 detached signatures over `"cryptorecipes/sign-detached-v1" || 0x00 || message`.
+Planned. Ed25519 and ML-DSA-44 detached signatures over `"crypto-recipes/sign-detached-v1" || 0x00 || message`.
 
 ## password-hash-v1
 

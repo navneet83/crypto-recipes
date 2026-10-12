@@ -1,6 +1,6 @@
 # Cross-language cryptographic recipes, verified by vectors: scope for version 1
 
-Working name: `cryptorecipes` (alternatives: `interop-recipes`, `vectorbook`). Status: draft scope, 2026-10-12, reweighted the same day toward the current recipes (hybrid post-quantum HPKE, XAES-256-GCM, ML-DSA) after the question "are these cutting edge".
+Name: `crypto-recipes` (published 2026-10-12; earlier working name `cryptorecipes`). Status: draft scope, 2026-10-12, reweighted the same day toward the current recipes (hybrid post-quantum HPKE, XAES-256-GCM, ML-DSA) after the question "are these cutting edge".
 
 ## 1. The one-paragraph pitch
 
@@ -38,7 +38,7 @@ Each recipe has an identifier that never changes meaning. A change to parameters
 
 ### R2 `hpke-envelope-v1`: encrypt to a recipient's public key
 
-- HPKE (RFC 9180) base mode, `DHKEM(X25519, HKDF-SHA256)`, `HKDF-SHA256`, `AES-256-GCM`, with a fixed application info string `cryptorecipes/hpke-envelope-v1`.
+- HPKE (RFC 9180) base mode, `DHKEM(X25519, HKDF-SHA256)`, `HKDF-SHA256`, `AES-256-GCM`, with a fixed application info string `crypto-recipes/hpke-envelope-v1`.
 - Layout: `version (0x01) || enc (32) || ciphertext || tag (16)`, Base64. Recipient public key: raw 32 bytes, Base64. Private key: raw 32 bytes.
 - Reuses: RFC 9180 test vectors for the HPKE core, plus this suite's vectors for the envelope.
 - Implementations use native HPKE where it exists (Go, CryptoKit, pyca) and otherwise build the RFC recipe from native X25519, HKDF and AES-GCM, which is the one place in the suite where a construction is assembled from parts; the RFC vectors are the check.
@@ -51,7 +51,7 @@ Each recipe has an identifier that never changes meaning. A change to parameters
 
 ### R3 `sign-detached-v1`: sign and verify a message
 
-- Ed25519 detached signatures over a domain-separated input: `"cryptorecipes/sign-detached-v1" || 0x00 || message`.
+- Ed25519 detached signatures over a domain-separated input: `"crypto-recipes/sign-detached-v1" || 0x00 || message`.
 - Keys: raw 32-byte seed and 32-byte public key, Base64. Signature: raw 64 bytes, Base64.
 - Reuses: the C2SP Ed25519 vectors for the primitive, this suite's vectors for the domain separation.
 - `sign-detached-pq-v1` with ML-DSA-44 follows the same pattern and is built alongside R3, not after it: ML-DSA is final (FIPS 204), it is in Java 24, .NET 10, Go 1.24 and liboqs, and anyone signing long-lived artifacts has to plan for it under the 2030 and 2035 deprecation dates. Its page also shows the hybrid form, Ed25519 and ML-DSA-44 signatures side by side with both required, which is what the conservative deployments do today.

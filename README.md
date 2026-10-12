@@ -1,4 +1,4 @@
-# cryptorecipes
+# crypto-recipes
 
 Cross-language cryptographic recipes, verified by test vectors.
 
