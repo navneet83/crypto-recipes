@@ -31,6 +31,9 @@ A decoder rejects anything shorter than 45 bytes or with a different first byte 
 | Swift | [`impl/swift/pbe_record_pbkdf2_gcm_v1.swift`](impl/swift/pbe_record_pbkdf2_gcm_v1.swift) | CryptoKit (AES-GCM), CommonCrypto (PBKDF2) |
 | TypeScript | [`impl/typescript/pbe_record_pbkdf2_gcm_v1.mjs`](impl/typescript/pbe_record_pbkdf2_gcm_v1.mjs) | WebCrypto (browser and Node 20+) |
 | Python | [`impl/python/pbe_record_pbkdf2_gcm_v1.py`](impl/python/pbe_record_pbkdf2_gcm_v1.py) | pyca/cryptography |
+| Go | [`impl/go/pbe_record_pbkdf2_gcm_v1.go`](impl/go/pbe_record_pbkdf2_gcm_v1.go) | standard library (`crypto/pbkdf2` needs Go 1.24; older Go uses `golang.org/x/crypto/pbkdf2`) |
+| Java, Kotlin | [`impl/java/PbeRecordPbkdf2GcmV1.java`](impl/java/PbeRecordPbkdf2GcmV1.java) | JCA (`javax.crypto`), Java 17+ and Android API 26+ |
+| C# | [`impl/csharp/PbeRecordPbkdf2GcmV1.cs`](impl/csharp/PbeRecordPbkdf2GcmV1.cs) | `System.Security.Cryptography`, .NET 6+ |
 
 **Relation to `pbe-record-v1`.** This is the fallback profile: PBKDF2 where Argon2id is not in the allowed list, and plain AES-GCM where the XAES-256-GCM construction is more than a reader wants. The two recipes do not interoperate.
 

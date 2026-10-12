@@ -28,8 +28,7 @@ Implementations are meant to be read and copied, so they are short, one file, an
 ## Checks before a pull request
 
 ```sh
-.venv/bin/python impl/python/harness.py
-node impl/typescript/harness.mjs
-swift impl/swift/pbe_record_pbkdf2_gcm_v1.swift
 sh tools/crosscheck.sh
 ```
+
+It runs every harness on the vectors and then every pair of implementations against each other. The README lists the toolchains it needs.

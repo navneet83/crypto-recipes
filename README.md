@@ -8,9 +8,9 @@ It is a test suite with worked examples, not a library to depend on. Copy the fi
 
 ## Recipes
 
-| Recipe | What it does | Swift | TypeScript | Python | Kotlin/Java | C# | Go |
+| Recipe | What it does | Swift | TypeScript | Python | Java (and Kotlin) | C# | Go |
 |---|---|---|---|---|---|---|---|
-| [`pbe-record-pbkdf2-gcm-v1`](RECIPES.md#pbe-record-pbkdf2-gcm-v1) | encrypt a short record with a password (PBKDF2 + AES-256-GCM) | ✅ | ✅ | ✅ | planned | planned | planned |
+| [`pbe-record-pbkdf2-gcm-v1`](RECIPES.md#pbe-record-pbkdf2-gcm-v1) | encrypt a short record with a password (PBKDF2 + AES-256-GCM) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `pbe-record-v1` | same task with Argon2id + XAES-256-GCM | planned | planned | planned | planned | planned | planned |
 | `hpke-envelope-v1` | encrypt to a recipient's public key (RFC 9180, X25519) | planned | | | | | |
 | `hpke-envelope-pq-v1` | same, hybrid X25519 + ML-KEM-768 | planned | | | | | |
@@ -34,13 +34,21 @@ Each harness replays the vectors, then fails on any mismatch. The cross-language
 
 ```sh
 python3 -m venv .venv && .venv/bin/pip install cryptography
+sh tools/crosscheck.sh          # all six harnesses, then every pair
+```
+
+Or one language at a time:
+
+```sh
 .venv/bin/python impl/python/harness.py
 node impl/typescript/harness.mjs
 swift impl/swift/pbe_record_pbkdf2_gcm_v1.swift
-sh tools/crosscheck.sh
+(cd impl/go && go run .)
+java -Drecipes.root=. impl/java/PbeRecordPbkdf2GcmV1.java
+dotnet run --project impl/csharp     # with RECIPES_ROOT pointing at the checkout
 ```
 
-CI runs the same four commands on macOS on every push.
+Needs Node 20+, Python 3.10+, Swift 5.9+, Go 1.24+, Java 17+ and .NET 8+. CI runs the crosscheck on macOS on every push.
 
 ## Rules
 
