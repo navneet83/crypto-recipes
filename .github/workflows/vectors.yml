@@ -57,7 +57,7 @@ jobs:
     container: mcr.microsoft.com/dotnet/sdk:10.0-alpine3.24
     steps:
       - uses: actions/checkout@v4
-      - run: openssl version
+      - run: apk add --no-cache openssl && openssl version
       - run: dotnet run --project impl/csharp -- --list
       - run: dotnet run --project impl/csharp -- --list | grep -qx sign-detached-pq-v1
       - run: dotnet run --project impl/csharp
