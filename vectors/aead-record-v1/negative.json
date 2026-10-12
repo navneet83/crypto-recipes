@@ -1,0 +1,111 @@
+{
+ "recipe": "aead-record-v1",
+ "note": "Every case must fail to decrypt. An implementation that returns any plaintext for any of them does not conform.",
+ "cases": [
+  {
+   "id": "wrong-key",
+   "key_hex": "0203030303030303030303030303030303030303030303030303030303030303",
+   "aad": "c2sp.org/XAES-256-GCM",
+   "input_base64": "AUFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWJhuwYMlk99UQ6F5Q3/Qg78/20Gr10CiH3Hrdp0=",
+   "note": "one key bit flipped"
+  },
+  {
+   "id": "wrong-aad",
+   "key_hex": "0303030303030303030303030303030303030303030303030303030303030303",
+   "aad": "c2sp.org/XAES-256-GCM ",
+   "input_base64": "AUFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWJhuwYMlk99UQ6F5Q3/Qg78/20Gr10CiH3Hrdp0=",
+   "note": "trailing space added to the additional data"
+  },
+  {
+   "id": "missing-aad",
+   "key_hex": "0303030303030303030303030303030303030303030303030303030303030303",
+   "aad": "",
+   "input_base64": "AUFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWJhuwYMlk99UQ6F5Q3/Qg78/20Gr10CiH3Hrdp0=",
+   "note": "record was sealed with additional data, opened with none"
+  },
+  {
+   "id": "tag-flipped",
+   "key_hex": "0303030303030303030303030303030303030303030303030303030303030303",
+   "aad": "c2sp.org/XAES-256-GCM",
+   "input_base64": "AUFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWJhuwYMlk99UQ6F5Q3/Qg78/20Gr10CiH3Hrdpw=",
+   "note": "last byte of the tag flipped"
+  },
+  {
+   "id": "ciphertext-flipped",
+   "key_hex": "0303030303030303030303030303030303030303030303030303030303030303",
+   "aad": "c2sp.org/XAES-256-GCM",
+   "input_base64": "AUFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWJluwYMlk99UQ6F5Q3/Qg78/20Gr10CiH3Hrdp0=",
+   "note": "first ciphertext byte flipped"
+  },
+  {
+   "id": "nonce-prefix-flipped",
+   "key_hex": "0303030303030303030303030303030303030303030303030303030303030303",
+   "aad": "c2sp.org/XAES-256-GCM",
+   "input_base64": "AUBCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWJhuwYMlk99UQ6F5Q3/Qg78/20Gr10CiH3Hrdp0=",
+   "note": "first nonce byte flipped, so the derived key differs"
+  },
+  {
+   "id": "nonce-suffix-flipped",
+   "key_hex": "0303030303030303030303030303030303030303030303030303030303030303",
+   "aad": "c2sp.org/XAES-256-GCM",
+   "input_base64": "AUFCQ0RFRkdISUpLTExOT1BRUlNUVVZXWJhuwYMlk99UQ6F5Q3/Qg78/20Gr10CiH3Hrdp0=",
+   "note": "byte 13 of the nonce flipped, so the GCM nonce differs"
+  },
+  {
+   "id": "truncated-tag",
+   "key_hex": "0303030303030303030303030303030303030303030303030303030303030303",
+   "aad": "c2sp.org/XAES-256-GCM",
+   "input_base64": "AUFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWJhuwYMlk99UQ6F5Q3/Qg78/20Gr10CiH3Hrdg==",
+   "note": "one byte of the tag missing"
+  },
+  {
+   "id": "truncated-to-header",
+   "key_hex": "0303030303030303030303030303030303030303030303030303030303030303",
+   "aad": "c2sp.org/XAES-256-GCM",
+   "input_base64": "AUFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWA==",
+   "note": "no ciphertext and no tag"
+  },
+  {
+   "id": "wrong-version",
+   "key_hex": "0303030303030303030303030303030303030303030303030303030303030303",
+   "aad": "c2sp.org/XAES-256-GCM",
+   "input_base64": "AkFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWJhuwYMlk99UQ6F5Q3/Qg78/20Gr10CiH3Hrdp0=",
+   "note": "version byte 0x02"
+  },
+  {
+   "id": "no-version",
+   "key_hex": "0303030303030303030303030303030303030303030303030303030303030303",
+   "aad": "c2sp.org/XAES-256-GCM",
+   "input_base64": "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYmG7BgyWT31RDoXlDf9CDvz/bQavXQKIfcet2nQ==",
+   "note": "layout without the leading byte"
+  },
+  {
+   "id": "empty-input",
+   "key_hex": "0303030303030303030303030303030303030303030303030303030303030303",
+   "aad": "c2sp.org/XAES-256-GCM",
+   "input_base64": "",
+   "note": "empty string"
+  },
+  {
+   "id": "not-base64",
+   "key_hex": "0303030303030303030303030303030303030303030303030303030303030303",
+   "aad": "c2sp.org/XAES-256-GCM",
+   "input_base64": "@@@@",
+   "note": "not Base64"
+  },
+  {
+   "id": "tag-moved",
+   "key_hex": "0303030303030303030303030303030303030303030303030303030303030303",
+   "aad": "c2sp.org/XAES-256-GCM",
+   "input_base64": "AUFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWH/Qg78/20Gr10CiH3Hrdp2YbsGDJZPfVEOheUM=",
+   "note": "tag placed before the ciphertext"
+  },
+  {
+   "id": "short-key",
+   "key_hex": "03030303030303030303030303030303",
+   "aad": "c2sp.org/XAES-256-GCM",
+   "input_base64": "AUFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWJhuwYMlk99UQ6F5Q3/Qg78/20Gr10CiH3Hrdp0=",
+   "note": "16-byte key; the recipe takes 32 bytes only"
+  }
+ ]
+}
