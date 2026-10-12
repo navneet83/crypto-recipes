@@ -95,9 +95,40 @@ Same shape as the PBKDF2 recipe. The two are told apart by which recipe the appl
 | Go | [`impl/go/pbe_record_v1.go`](impl/go/pbe_record_v1.go) | `golang.org/x/crypto/argon2` |
 | Swift, Java, Kotlin, C# | use `pbe-record-pbkdf2-gcm-v1` | CryptoKit, the JDK and .NET ship no Argon2. Adding libsodium or Bouncy Castle would make a recipe that is only as portable as that dependency; the PBKDF2 recipe is the honest answer until the platforms catch up. |
 
-## hpke-envelope-v1, hpke-envelope-pq-v1
+## hpke-envelope-v1
 
-Planned. HPKE base mode (RFC 9180) with `DHKEM(X25519, HKDF-SHA256)`, `HKDF-SHA256`, `AES-256-GCM`, info string `crypto-recipes/hpke-envelope-v1`. The post-quantum variant uses the hybrid X25519 + ML-KEM-768 KEM from the IETF draft current at the time of writing; the page will record the exact draft.
+**Task.** Encrypt a short record so that only the holder of one private key can read it: a secret for a server, a message for a user's device, a backup key for an escrow service. The sender needs only the recipient's 32-byte public key.
+
+**Not for.** Authenticating the sender (anyone with the public key can produce a record; sign it with `sign-detached-v1` if that matters), confidentiality against a future quantum computer (see `hpke-envelope-pq-v1`), or large files (use age).
+
+**Suite.** HPKE (RFC 9180) base mode with `DHKEM(X25519, HKDF-SHA256)`, `HKDF-SHA256` and `AES-256-GCM`, single-shot, no additional data. The HPKE info string is `crypto-recipes/hpke-envelope-v1`, so a record sealed for another protocol with the same key does not open here; the negative case `wrong-info` checks that.
+
+**Keys.** The recipient private key is the 32-byte X25519 scalar and the public key is the 32-byte point, both Base64 when transported.
+
+**Layout.** Base64 (standard alphabet, with padding) of
+
+```
+version (1 byte, 0x01) || enc (32) || ciphertext || tag (16)
+```
+
+`enc` is the sender's ephemeral public key. Every record has a fresh one, so two encryptions of one plaintext differ.
+
+**Vectors.** [`vectors/hpke-envelope-v1/`](vectors/hpke-envelope-v1/). None of the native APIs let a caller fix the ephemeral key, so `cases.json` holds records to open rather than outputs to reproduce. An implementation must derive the public key from the private key, open every record, and have its own records opened by every other implementation. [`rfc9180.json`](vectors/hpke-envelope-v1/rfc9180.json) is the CFRG test vector for exactly this suite. `tools/hpke_rfc9180_check.mjs` checks the TypeScript implementation's key derivation, shared secret, key schedule and ciphertext against it, and case `rfc9180-recipient` uses its recipient key.
+
+**Implementations.**
+
+| Language | File | HPKE from |
+|---|---|---|
+| Swift | [`impl/swift/Sources/Recipes/HpkeEnvelopeV1.swift`](impl/swift/Sources/Recipes/HpkeEnvelopeV1.swift) | CryptoKit `HPKE`, macOS 14 and iOS 17; its ready-made X25519 suite uses ChaCha20-Poly1305, so the suite is spelled out |
+| TypeScript | [`impl/typescript/hpke_envelope_v1.mjs`](impl/typescript/hpke_envelope_v1.mjs) | assembled from WebCrypto X25519, HMAC and AES-GCM per RFC 9180 and checked against the CFRG vector; Node 20+ and current browsers |
+| Python | [`impl/python/hpke_envelope_v1.py`](impl/python/hpke_envelope_v1.py) | pyca/cryptography `hpke` |
+| Go | [`impl/go/hpke_envelope_v1.go`](impl/go/hpke_envelope_v1.go) | `crypto/hpke`, Go 1.26 |
+| Java, Kotlin | [`impl/java/HpkeEnvelopeV1.java`](impl/java/HpkeEnvelopeV1.java) | the JDK's `HPKE` Cipher, Java 26 |
+| C# | none | .NET has no X25519 as of .NET 10 |
+
+## hpke-envelope-pq-v1
+
+Planned. The same envelope with the hybrid KEM `MLKEM768-X25519` (X-Wing) from draft-ietf-hpke-pq.
 
 ## sign-detached-v1
 

@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 25
+          java-version: 27
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
@@ -43,7 +43,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 25
+          java-version: 27
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
