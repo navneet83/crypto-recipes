@@ -21,7 +21,7 @@ It is a test suite with worked examples, not a library to depend on. Copy the fi
 
 ¹ No Argon2id in the platform's standard library. These platforms use `pbe-record-pbkdf2-gcm-v1`, which is the same recipe with PBKDF2; the two do not interoperate, and the recipe page explains the choice.
 ² .NET has no Ed25519 in `System.Security.Cryptography`; the recipe page says what to do.
-³ .NET 10 enables ML-DSA on Linux (OpenSSL 3.5+) and Windows, not on macOS; the Linux CI job covers it.
+³ .NET 10 enables ML-DSA on Linux with OpenSSL 3.5+ and on Windows, not on macOS. Ubuntu runners still ship OpenSSL 3.0, so CI checks the C# file in the Alpine 3.24 .NET image, against the vectors only.
 
 [RECIPES.md](RECIPES.md) has one page per recipe: what it is for, what it is not for, the exact layout, and the parameters that must not be lowered. [SCOPE.md](SCOPE.md) is the plan for version 1.
 
