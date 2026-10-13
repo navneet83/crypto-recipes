@@ -82,7 +82,10 @@ func pqRecipes() -> [(String, Recipe)] {
 
 func mldsaRecipes() -> [(String, Recipe)] {
     if #available(macOS 26.0, iOS 26.0, *) {
-        return [(SignDetachedPqV1.recipe, signatureRecipe(publicKey: SignDetachedPqV1.publicKey, sign: SignDetachedPqV1.sign, verify: SignDetachedPqV1.verify, deterministic: false))]
+        return [(HpkeEnvelopePqV1.recipe, envelopeRecipe(publicKey: { try HpkeEnvelopePqV1.publicKey(privateKey: $0) },
+                                                         encrypt: { try HpkeEnvelopePqV1.encrypt(publicKey: $0, plaintext: $1) },
+                                                         decrypt: { try HpkeEnvelopePqV1.decrypt(privateKey: $0, text: $1) })),
+                (SignDetachedPqV1.recipe, signatureRecipe(publicKey: SignDetachedPqV1.publicKey, sign: SignDetachedPqV1.sign, verify: SignDetachedPqV1.verify, deterministic: false))]
     }
     return []
 }

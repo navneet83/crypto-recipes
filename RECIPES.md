@@ -128,7 +128,34 @@ version (1 byte, 0x01) || enc (32) || ciphertext || tag (16)
 
 ## hpke-envelope-pq-v1
 
-Planned. The same envelope with the hybrid KEM `MLKEM768-X25519` (X-Wing) from draft-ietf-hpke-pq.
+**Task.** The same as `hpke-envelope-v1`, for records that must stay confidential after a cryptographically relevant quantum computer exists. An attacker who records ciphertext today and decrypts it later is the threat this answers.
+
+**Not for.** Tight size budgets: every record carries a 1120-byte encapsulation, against 32 bytes for X25519 alone.
+
+**Suite.** HPKE base mode with the hybrid KEM `MLKEM768-X25519` (X-Wing, KEM id `0x647a`) from [draft-ietf-hpke-pq](https://github.com/hpkewg/hpke-pq), `HKDF-SHA256` and `AES-256-GCM`, single-shot, no additional data. A record stays confidential unless both ML-KEM-768 and X25519 are broken. The HPKE info string is `crypto-recipes/hpke-envelope-pq-v1`. The KEM comes from an Internet-Draft; if a later draft changes its bytes, this recipe gets a new identifier rather than new behaviour.
+
+**Keys.** The recipient private key is the 32-byte X-Wing seed. The public key is the ML-KEM-768 public key (1184 bytes) followed by the X25519 point (32 bytes), 1216 bytes in all. Where a platform takes the two halves separately, the seed is expanded as the draft says: `SHAKE256(seed, 96)` gives the 64-byte ML-KEM seed and then the 32-byte X25519 scalar.
+
+**Layout.** Base64 (standard alphabet, with padding) of
+
+```
+version (1 byte, 0x01) || enc (1120) || ciphertext || tag (16)
+```
+
+`enc` is the ML-KEM ciphertext (1088 bytes) followed by the sender's ephemeral X25519 point (32 bytes).
+
+**Vectors.** [`vectors/hpke-envelope-pq-v1/`](vectors/hpke-envelope-pq-v1/). As with the classical recipe, `cases.json` holds records to open. Beyond the usual tampering, the negative cases flip a byte inside each half of `enc` and try a classical `hpke-envelope-v1` record made from the same seed. Two upstream vector sets are included and checked by `tools/hpke_pq_check.mjs`. [`draft-xwing.json`](vectors/hpke-envelope-pq-v1/draft-xwing.json) comes from the X-Wing draft and covers key expansion and decapsulation. [`draft-hpke-pq.json`](vectors/hpke-envelope-pq-v1/draft-hpke-pq.json) comes from the HPKE draft and covers the public key, shared secret, key schedule and a ciphertext. The draft publishes this KEM only with ChaCha20-Poly1305, so that vector checks everything except the AEAD choice; the AES-256-GCM path is the one already checked for `hpke-envelope-v1`. Python reproduces the draft's public key from its seed, and Python, Go, Swift and Node open each other's records.
+
+**Implementations.**
+
+| Language | File | X-Wing HPKE from |
+|---|---|---|
+| Swift | [`impl/swift/Sources/Recipes/HpkeEnvelopePqV1.swift`](impl/swift/Sources/Recipes/HpkeEnvelopePqV1.swift) | CryptoKit `HPKE` with `XWingMLKEM768X25519`, macOS 26 and iOS 26 |
+| TypeScript | [`impl/typescript/hpke_envelope_pq_v1.mjs`](impl/typescript/hpke_envelope_pq_v1.mjs) | assembled from `node:crypto` ML-KEM-768, X25519, SHA-3 and HMAC, checked against both drafts; Node 26, not browsers |
+| Python | [`impl/python/hpke_envelope_pq_v1.py`](impl/python/hpke_envelope_pq_v1.py) | pyca/cryptography `hpke`, with the seed expanded by `hashlib` |
+| Go | [`impl/go/hpke_envelope_pq_v1.go`](impl/go/hpke_envelope_pq_v1.go) | `crypto/hpke` `MLKEM768X25519`, Go 1.26 |
+| Java, Kotlin | none | the JDK's HPKE Cipher has no hybrid KEMs, and its SHAKE256 has a fixed 64-byte output, so the seed cannot be expanded without a library |
+| C# | none | .NET has no X25519 |
 
 ## sign-detached-v1
 

@@ -10,6 +10,7 @@ import * as argon2 from "./pbe_record_v1.mjs";
 import * as sign from "./sign_detached_v1.mjs";
 import * as signPq from "./sign_detached_pq_v1.mjs";
 import * as hpke from "./hpke_envelope_v1.mjs";
+import * as hpkePq from "./hpke_envelope_pq_v1.mjs";
 
 const hex = h => Uint8Array.from(h.match(/../g) ?? [], b => parseInt(b, 16));
 const toHex = b => [...b].map(x => x.toString(16).padStart(2, "0")).join("");
@@ -32,6 +33,7 @@ const RECIPES = {
     },
     ...(argon2.available ? { [argon2.RECIPE]: passwordRecipe(argon2) } : {}),
     [hpke.RECIPE]: envelopeRecipe(hpke),
+    ...(hpkePq.available ? { [hpkePq.RECIPE]: envelopeRecipe(hpkePq) } : {}),
     [sign.RECIPE]: signatureRecipe(sign, true),
     ...(signPq.available ? { [signPq.RECIPE]: signatureRecipe(signPq, false) } : {}),
 };

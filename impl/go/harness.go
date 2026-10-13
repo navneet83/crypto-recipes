@@ -115,7 +115,7 @@ func unhex(s string) []byte { b, _ := hex.DecodeString(s); return b }
 
 func randomHex(n int) string { b := make([]byte, n); rand.Read(b); return hex.EncodeToString(b) }
 
-var recipeOrder = []string{Recipe, AeadRecipe, Argon2Recipe, SignRecipe, SignPqRecipe, HpkeRecipe}
+var recipeOrder = []string{Recipe, AeadRecipe, Argon2Recipe, SignRecipe, SignPqRecipe, HpkeRecipe, HpkePqRecipe}
 
 // Encryption vectors carry the plaintext, signature vectors the message.
 func expected(c fields) string {
@@ -151,6 +151,7 @@ var recipes = map[string]recipe{
 		consume: func(it fields) (string, error) { return Argon2Decrypt(it["password"], it["record"]) },
 	},
 	HpkeRecipe:   envelopeRecipe(HpkePublicKey, HpkeEncrypt, HpkeDecrypt),
+	HpkePqRecipe: envelopeRecipe(HpkePqPublicKey, HpkePqEncrypt, HpkePqDecrypt),
 	SignRecipe:   signatureRecipe(SignPublicKey, Sign, Verify, false),
 	SignPqRecipe: signatureRecipe(SignPqPublicKey, SignPq, VerifyPq, true),
 	AeadRecipe: {

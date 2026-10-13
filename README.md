@@ -14,7 +14,7 @@ It is a test suite with worked examples, not a library to depend on. Copy the fi
 | [`aead-record-v1`](RECIPES.md#aead-record-v1) | encrypt a short record with a key you already have (XAES-256-GCM) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | [`pbe-record-v1`](RECIPES.md#pbe-record-v1) | encrypt a short record with a password (Argon2id + AES-256-GCM) | PBKDF2¹ | ✅ Node | ✅ | PBKDF2¹ | PBKDF2¹ | ✅ |
 | [`hpke-envelope-v1`](RECIPES.md#hpke-envelope-v1) | encrypt to a recipient's public key (HPKE, X25519) | ✅ | ✅ | ✅ | ✅ Java 26 | none⁴ | ✅ |
-| `hpke-envelope-pq-v1` | same, hybrid X25519 + ML-KEM-768 | planned | | | | | |
+| [`hpke-envelope-pq-v1`](RECIPES.md#hpke-envelope-pq-v1) | the same, post-quantum hybrid (X-Wing) | ✅ macOS 26 | ✅ Node | ✅ | none⁵ | none⁴ | ✅ |
 | [`sign-detached-v1`](RECIPES.md#sign-detached-v1) | sign a message and verify the signature (Ed25519) | ✅ | ✅ | ✅ | ✅ | none² | ✅ |
 | [`sign-detached-pq-v1`](RECIPES.md#sign-detached-pq-v1) | the same, post-quantum (ML-DSA-65) | ✅ macOS 26 | ✅ Node | ✅ | ✅ Java 24 | ✅ Linux/Windows³ | ✅ |
 | `password-hash-v1` | store and verify a password | planned | | | | | |
@@ -23,6 +23,7 @@ It is a test suite with worked examples, not a library to depend on. Copy the fi
 ² .NET has no Ed25519 in `System.Security.Cryptography`; the recipe page says what to do.
 ³ .NET 10 enables ML-DSA on Linux with OpenSSL 3.5+ and on Windows, not on macOS. Ubuntu runners still ship OpenSSL 3.0, so CI checks the C# file in the Alpine 3.24 .NET image, against the vectors only.
 ⁴ .NET has no X25519, so it cannot take part in X25519 HPKE.
+⁵ The JDK's HPKE has no hybrid KEMs and its SHAKE256 output is fixed at 64 bytes, so Java cannot build X-Wing without a library.
 
 [RECIPES.md](RECIPES.md) has one page per recipe: what it is for, what it is not for, the exact layout, and the parameters that must not be lowered. [SCOPE.md](SCOPE.md) is the plan for version 1.
 

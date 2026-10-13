@@ -12,6 +12,7 @@ import uuid
 
 sys.path.insert(0, os.path.dirname(__file__))
 import aead_record_v1  # noqa: E402
+import hpke_envelope_pq_v1  # noqa: E402
 import hpke_envelope_v1  # noqa: E402
 import pbe_record_pbkdf2_gcm_v1  # noqa: E402
 import pbe_record_v1  # noqa: E402
@@ -89,7 +90,14 @@ class Hpke:
         return self.r.decrypt(bytes.fromhex(it["private_hex"]), it["record"])
 
 
-RECIPES = {Pbe.r.RECIPE: Pbe(), Hpke.r.RECIPE: Hpke(), Aead.r.RECIPE: Aead(), Argon2.r.RECIPE: Argon2(), Sign.r.RECIPE: Sign(), SignPq.r.RECIPE: SignPq()}
+class HpkePq(Hpke):
+    r = hpke_envelope_pq_v1
+    def emit(self, i):
+        seed = os.urandom(32); pub = self.r.public_key(seed)
+        return {"private_hex": seed.hex(), "public_hex": pub.hex(), "plaintext": _plaintext(i), "record": self.r.encrypt(pub, _plaintext(i))}
+
+
+RECIPES = {Pbe.r.RECIPE: Pbe(), Hpke.r.RECIPE: Hpke(), HpkePq.r.RECIPE: HpkePq(), Aead.r.RECIPE: Aead(), Argon2.r.RECIPE: Argon2(), Sign.r.RECIPE: Sign(), SignPq.r.RECIPE: SignPq()}
 
 
 def expected(c):
